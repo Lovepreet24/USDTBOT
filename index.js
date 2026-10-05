@@ -1,28 +1,10 @@
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
-const dbFile = path.join(__dirname, 'database.json');
-
-// Local JSON Database functions
-function loadDb() {
-    try {
-        if (!fs.existsSync(dbFile)) {
-            fs.writeFileSync(dbFile, JSON.stringify({}));
-        }
-        const data = fs.readFileSync(dbFile, 'utf8');
-        return JSON.parse(data);
-    } catch (e) {
-        return {};
-    }
-}
-
-function saveDb(data) {
-    try {
-        fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
-    } catch (e) {}
-}
+const supabaseUrl = 'https://uxunxwbmftxwqpfaoxhn.supabase.co';
+const supabaseKey = 'sb_publishable_7gH_czDbW2vpHDjHSRoWog_zICHBSFB';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const token = '8996114363:AAG6KZtjbzgI8H7mceyKECWD5Yng29TXudQ';
 const webAppUrl = 'https://airdropnewmera.vercel.app/'; 
@@ -45,21 +27,25 @@ async function handleTelegramUpdate(msg) {
     const text = msg.text;
     const userName = msg.from.first_name || 'Commander';
 
-    let db = loadDb();
+    let { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('chat_id', chatId)
+        .single();
+
+    if (!user) {
+        await supabase.from('users').insert([{ chat_id: chatId, balance: 500 }]);
+        user = { balance: 500 };
+    }
 
     if (text && text.startsWith('/start')) {
-        if (!db[chatId]) {
-            db[chatId] = { balance: 500 };
-            saveDb(db);
-        }
         bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...getMainMenu(chatId) });
         return;
     }
 
     if (!text) return;
 
-    let user = db[chatId] || { balance: 500 };
-    let currentBal = user.balance;
+    let currentBal = user.balance || 500;
     let usdtVal = (currentBal * 0.0001).toFixed(2);
 
     if (text === "🌌 My Profile") {
@@ -129,12 +115,11 @@ const server = http.createServer((req, res) => {
         req.on('end', async () => {
             try {
                 if (parsedData.userId && parsedData.balance !== undefined) {
-                    let db = loadDb();
-                    if (!db[parsedData.userId]) db[parsedData.userId] = {};
-                    db[parsedData.userId].balance = parsedData.balance;
-                    saveDb(db);
+                    await supabase
+                        .from('users')
+                        .upsert({ chat_id: parsedData.userId.toString(), balance: parsedData.balance });
                     
-                    bot.sendMessage(parsedData.userId, `🔄 **Auto-Sync:** Your balance is updated to ${parsedData.balance} GALAXY in the database. ✅`, { parse_mode: "Markdown" });
+                    bot.sendMessage(parsedData.userId, `🔄 **Auto-Sync:** Your balance is updated to ${parsedData.balance} GALAXY in Supabase. ✅`, { parse_mode: "Markdown" });
                     
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: true }));
