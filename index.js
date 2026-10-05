@@ -1483,3 +1483,245 @@ const server =
             );
             return;
           }
+
+          const payoutId =
+            Number(
+              data.payoutId
+            );
+
+          const status =
+            data.status;
+
+          const txHash =
+            data.txHash ||
+            null;
+
+          const result =
+            await updatePayoutStatus(
+              payoutId,
+              status,
+              txHash
+            );
+
+          res.writeHead(200, {
+            "Content-Type":
+              "application/json",
+          });
+
+          res.end(
+            JSON.stringify({
+              ok: true,
+              result,
+            })
+          );
+
+          return;
+        }
+
+        // ----------------------------------------------------
+        // 404
+        // ----------------------------------------------------
+
+        res.writeHead(404, {
+          "Content-Type":
+            "application/json",
+        });
+
+        res.end(
+          JSON.stringify({
+            error:
+              "Not found",
+          })
+        );
+      } catch (err) {
+        console.error(
+          "SERVER ERROR:",
+          err
+        );
+
+        res.writeHead(500, {
+          "Content-Type":
+            "application/json",
+        });
+
+        res.end(
+          JSON.stringify({
+            error:
+              "Internal server error",
+            details:
+              err.message,
+          })
+        );
+      }
+    }
+  );
+
+// ============================================================
+// TELEGRAM BOT COMMANDS
+// ============================================================
+
+bot.onText(
+  /^\/start(?:\s+(.+))?$/i,
+  async (msg, match) => {
+    try {
+      const chatId =
+        String(msg.chat.id);
+
+      const referralCode =
+        match?.[1] || null;
+
+      await createUser(
+        msg.from,
+        referralCode
+      );
+
+      await bot.sendMessage(
+        chatId,
+        `🍃 <b>Welcome to USDT Galaxy!</b>\n\n` +
+          `Earn GALAXY by completing tasks, playing games and inviting friends.\n\n` +
+          `💰 <b>10,000 GALAXY = 1 USDT</b>\n\n` +
+          `👇 Open the Mini App to start earning.`,
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "🚀 Open USDT Galaxy",
+                  web_app: {
+                    url: WEB_APP_URL,
+                  },
+                },
+              ],
+            ],
+          },
+        }
+      );
+    } catch (err) {
+      console.error(
+        "/start error:",
+        err.message
+      );
+    }
+  }
+);
+
+// ============================================================
+// /app
+// ============================================================
+
+bot.onText(
+  /^\/app$/i,
+  async (msg) => {
+    try {
+      await bot.sendMessage(
+        msg.chat.id,
+        "🚀 Open USDT Galaxy:",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "🚀 Open Mini App",
+                  web_app: {
+                    url: WEB_APP_URL,
+                  },
+                },
+              ],
+            ],
+          },
+        }
+      );
+    } catch (err) {
+      console.error(
+        "/app error:",
+        err.message
+      );
+    }
+  }
+);
+
+// ============================================================
+// START SERVER
+// ============================================================
+
+const PORT =
+  process.env.PORT || 10000;
+
+server.listen(
+  PORT,
+  async () => {
+    console.log(
+      `USDT Galaxy backend running on port ${PORT}`
+    );
+
+    console.log(
+      `Backend URL: ${BACKEND_URL}`
+    );
+
+    console.log(
+      `Auto payout: ${AUTO_PAYOUT}`
+    );
+
+    console.log(
+      `Payout wallet: ${PAYOUT_WALLET}`
+    );
+
+    console.log(
+      `BSC USDT: ${BSC_USDT_CONTRACT}`
+    );
+
+    // --------------------------------------------------------
+    // Telegram webhook
+    // --------------------------------------------------------
+
+    try {
+      const webhookUrl =
+        `${BACKEND_URL}/telegram-webhook`;
+
+      await bot.setWebHook(
+        webhookUrl
+      );
+
+      console.log(
+        "Telegram webhook:",
+        webhookUrl
+      );
+    } catch (err) {
+      console.error(
+        "Webhook setup error:",
+        err.message
+      );
+    }
+  }
+);
+
+// ============================================================
+// GRACEFUL SHUTDOWN
+// ============================================================
+
+process.on(
+  "SIGTERM",
+  () => {
+    console.log(
+      "SIGTERM received. Shutting down..."
+    );
+
+    server.close(() => {
+      process.exit(0);
+    });
+  }
+);
+
+process.on(
+  "SIGINT",
+  () => {
+    console.log(
+      "SIGINT received. Shutting down..."
+    );
+
+    server.close(() => {
+      process.exit(0);
+    });
+  }
+);
