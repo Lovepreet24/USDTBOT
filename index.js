@@ -1,8 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 const mongoose = require('mongoose');
-const path = require('path');
-const fs = require('fs');
 
 const mongoURI = process.env.MONGO_URI || 'mongodb+srv://bhullar241:Lovepreet241@bhullar.jjzhl1x.mongodb.net/galaxybot?retryWrites=true&w=majority&appName=Bhullar';
 
@@ -17,7 +15,7 @@ const userSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 
 const token = '8996114363:AAG6KZtjbzgI8H7mceyKECWD5Yng29TXudQ';
-const webAppUrl = 'https://airdropnewmera.vercel.app/'; 
+const webAppUrl = 'https://airdropnewmera.vercel.app/'; // Vercel wala Mini App link
 const botUsername = 'USDTGalaxyProRobot'; 
 const paymentChannel = '@usdt_GalaxyPayments'; 
 
@@ -84,24 +82,9 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🌐 Serve Mini App (public/index.html)
-    if (req.url === '/' || req.url === '/index.html') {
-        const filePath = path.join(__dirname, 'public', 'index.html');
-        fs.readFile(filePath, (err, content) => {
-            if (err) {
-                res.writeHead(500, { 'Content-Type': 'text/plain' });
-                res.end('Mini App index.html not found in public folder.');
-            } else {
-                res.writeHead(200, { 'Content-Type': 'text/html' });
-                res.end(content, 'utf-8');
-            }
-        });
-        return;
-    }
-
-    if (req.url === '/health') {
+    if (req.url === '/' || req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Bot and Mini App server is running!');
+        res.end('Bot Backend and Sync Server is running!');
         return;
     }
 
