@@ -1,10 +1,8 @@
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
-const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = 'https://uxunxwbmftxwqpfaoxhn.supabase.co';
 const supabaseKey = 'sb_publishable_7gH_czDbW2vpHDjHSRoWog_zICHBSFB';
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 const token = '8996114363:AAG6KZtjbzgI8H7mceyKECWD5Yng29TXudQ';
 const webAppUrl = 'https://airdropnewmera.vercel.app/'; 
@@ -21,21 +19,69 @@ if (railwayUrl) {
         .catch(err => console.error('❌ Webhook error:', err));
 }
 
+// Supabase helper functions using native fetch
+async function getUser(chatId) {
+    try {
+        const res = await fetch(`${supabaseUrl}/rest/v1/users?chat_id=eq.${chatId}&select=*`, {
+            headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`
+            }
+        });
+        const data = await res.json();
+        return data.length > 0 ? data[0] : null;
+    } catch (e) {
+        console.error('Supabase fetch error:', e);
+        return null;
+    }
+}
+
+async function createUser(chatId) {
+    try {
+        await fetch(`${supabaseUrl}/rest/v1/users`, {
+            method: 'POST',
+            headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ chat_id: chatId, balance: 500 })
+        });
+        return { balance: 500 };
+    } catch (e) {
+        console.error('Supabase create error:', e);
+        return { balance: 500 };
+    }
+}
+
+async function updateUserBalance(chatId, balance) {
+    try {
+        await fetch(`${supabaseUrl}/rest/v1/users?chat_id=eq.${chatId}`, {
+            method: 'PATCH',
+            headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ balance: balance })
+        });
+    } catch (e) {
+        console.error('Supabase update error:', e);
+    }
+}
+
 async function handleTelegramUpdate(msg) {
     if (!msg || !msg.chat) return;
     const chatId = msg.chat.id.toString();
     const text = msg.text;
     const userName = msg.from.first_name || 'Commander';
 
-    let { data: user, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('chat_id', chatId)
-        .single();
+    let user = await getUser(chatId);
 
     if (!user) {
-        await supabase.from('users').insert([{ chat_id: chatId, balance: 500 }]);
-        user = { balance: 500 };
+        user = await createUser(chatId);
     }
 
     if (text && text.startsWith('/start')) {
@@ -45,7 +91,7 @@ async function handleTelegramUpdate(msg) {
 
     if (!text) return;
 
-    let currentBal = user.balance || 500;
+    let currentBal = user.balance !== undefined ? user.balance : 500;
     let usdtVal = (currentBal * 0.0001).toFixed(2);
 
     if (text === "🌌 My Profile") {
@@ -115,11 +161,16 @@ const server = http.createServer((req, res) => {
         req.on('end', async () => {
             try {
                 if (parsedData.userId && parsedData.balance !== undefined) {
-                    await supabase
-                        .from('users')
-                        .upsert({ chat_id: parsedData.userId.toString(), balance: parsedData.balance });
+                    const chatIdStr = parsedData.userId.toString();
+                    let existing = await getUser(chatIdStr);
+                    if (existing) {
+                        await updateUserBalance(chatIdStr, parsedData.balance);
+                    } else {
+                        await createUser(chatIdStr);
+                        await updateUserBalance(chatIdStr, parsedData.balance);
+                    }
                     
-                    bot.sendMessage(parsedData.userId, `🔄 **Auto-Sync:** Your balance is updated to ${parsedData.balance} GALAXY in Supabase. ✅`, { parse_mode: "Markdown" });
+                    bot.sendMessage(chatIdStr, `🔄 **Auto-Sync:** Your balance is updated to ${parsedData.balance} GALAXY in Supabase. ✅`, { parse_mode: "Markdown" });
                     
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: true }));
