@@ -15,46 +15,43 @@ const userSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 
 const token = '8996114363:AAG6KZtjbzgI8H7mceyKECWD5Yng29TXudQ';
-const webAppUrl = 'https://airdropnewmera.vercel.app/'; // Vercel wala Mini App link
+const webAppUrl = 'https://airdropnewmera.vercel.app/'; 
 const botUsername = 'USDTGalaxyProRobot'; 
 const paymentChannel = '@usdt_GalaxyPayments'; 
 
-const bot = new TelegramBot(token, { polling: true });
+// 🛑 Polling hata kar Webhook mode set kar rahe hain
+const bot = new TelegramBot(token);
 
-function getMainMenu(userId) {
-    return {
-        reply_markup: {
-            keyboard: [
-                [{ text: "🌌 My Profile" }, { text: "🛸 Invite Crew" }],
-                [{ text: "💳 Payout (USDT)" }, { text: "🎬 Watch & Earn", web_app: { url: `${webAppUrl}?userid=${userId}` } }]
-            ],
-            resize_keyboard: true,
-            is_persistent: true
-        }
-    };
+// Railway ka static domain automatically detect karega
+const railwayUrl = process.env.RAILWAY_STATIC_URL ? `https://${process.env.RAILWAY_STATIC_URL}` : process.env.WEBHOOK_URL;
+
+if (railwayUrl) {
+    bot.setWebHook(`${railwayUrl}/bot${token}`)
+        .then(() => console.log(`🔗 Webhook successfully set to: ${railwayUrl}/bot${token}`))
+        .catch(err => console.error('❌ Webhook error:', err));
 }
 
-bot.onText(/\/start(.*)/, async (msg) => {
-    const chatId = msg.chat.id.toString();
-    const userName = msg.from.first_name || 'Commander';
-
-    try {
-        let user = await User.findOne({ userId: chatId });
-        if (!user) {
-            user = new User({ userId: chatId, balance: 500 }); 
-            await user.save();
-        }
-        bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...getMainMenu(chatId) });
-    } catch (err) {
-        bot.sendMessage(chatId, "⚠️ Server error. Please try again.");
-    }
-});
-
-bot.on('message', async (msg) => {
+async function handleTelegramUpdate(msg) {
+    if (!msg || !msg.chat) return;
     const chatId = msg.chat.id.toString();
     const text = msg.text;
+    const userName = msg.from.first_name || 'Commander';
 
-    if (!text || text.startsWith('/start')) return;
+    if (text && text.startsWith('/start')) {
+        try {
+            let user = await User.findOne({ userId: chatId });
+            if (!user) {
+                user = new User({ userId: chatId, balance: 500 }); 
+                await user.save();
+            }
+            bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...getMainMenu(chatId) });
+        } catch (err) {
+            bot.sendMessage(chatId, "⚠️ Server error. Please try again.");
+        }
+        return;
+    }
+
+    if (!text) return;
 
     try {
         let user = await User.findOne({ userId: chatId });
@@ -73,7 +70,20 @@ bot.on('message', async (msg) => {
     } catch (err) {
         console.error(err);
     }
-});
+}
+
+function getMainMenu(userId) {
+    return {
+        reply_markup: {
+            keyboard: [
+                [{ text: "🌌 My Profile" }, { text: "🛸 Invite Crew" }],
+                [{ text: "💳 Payout (USDT)" }, { text: "🎬 Watch & Earn", web_app: { url: `${webAppUrl}?userid=${userId}` } }]
+            ],
+            resize_keyboard: true,
+            is_persistent: true
+        }
+    };
+}
 
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -84,10 +94,31 @@ const server = http.createServer((req, res) => {
 
     if (req.url === '/' || req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Bot Backend and Sync Server is running!');
+        res.end('Bot Webhook Server is running!');
         return;
     }
 
+    // Telegram Webhook Endpoint
+    if (req.method === 'POST' && req.url === `/bot${token}`) {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', () => {
+            try {
+                const update = JSON.parse(body);
+                if (update.message) {
+                    handleTelegramUpdate(update.message);
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'ok' }));
+            } catch (e) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid payload' }));
+            }
+        });
+        return;
+    }
+
+    // Mini App Sync Endpoint
     if (req.method === 'POST' && req.url === '/sync') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
@@ -118,10 +149,11 @@ const server = http.createServer((req, res) => {
                 res.end(JSON.stringify({ error: 'Server error' })); 
             }
         });
-    } else {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Not found');
+        return;
     }
+
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not found');
 });
 
 const PORT = process.env.PORT || 10000;
