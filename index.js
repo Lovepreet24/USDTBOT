@@ -1219,8 +1219,5 @@ server.listen(
       console.error(
         "❌ Webhook setup error:",
         error
-      );
-    }
-
-  }
-);
+          }
+});
