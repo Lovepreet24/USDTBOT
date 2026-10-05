@@ -1,194 +1,964 @@
-const TelegramBot = require('node-telegram-bot-api');
-const http = require('http');
+const TelegramBot = require("node-telegram-bot-api");
+const http = require("http");
+const crypto = require("crypto");
 
-const supabaseUrl = 'https://uxunxwbmftxwqpfaoxhn.supabase.co';
-const supabaseKey = 'sb_publishable_7gH_czDbW2vpHDjHSRoWog_zICHBSFB';
+// ==================================================
+// CONFIG
+// ==================================================
 
-const token = '8996114363:AAG6KZtjbzgI8H7mceyKECWD5Yng29TXudQ';
-const webAppUrl = 'https://airdropnewmera.vercel.app/'; 
-const botUsername = 'USDTGalaxyProRobot'; 
-const paymentChannel = '@usdt_GalaxyPayments'; 
+const BOT_TOKEN = "8996114363:AAG6KZtjbzgI8H7mceyKECWD5Yng29TXudQ";
 
-const bot = new TelegramBot(token);
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ||
+  "https://uxunxwbmftxwqpfaoxhn.supabase.co";
 
-const railwayUrl = process.env.RAILWAY_STATIC_URL ? `https://${process.env.RAILWAY_STATIC_URL}` : process.env.WEBHOOK_URL;
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (railwayUrl) {
-    bot.setWebHook(`${railwayUrl}/bot${token}`)
-        .then(() => console.log(`🔗 Webhook successfully set to: ${railwayUrl}/bot${token}`))
-        .catch(err => console.error('❌ Webhook error:', err));
+const WEB_APP_URL =
+  process.env.WEB_APP_URL ||
+  "https://airdropnewmera.vercel.app/";
+
+const BACKEND_URL =
+  process.env.BACKEND_URL ||
+  "https://usdtbot-production-89e9.up.railway.app";
+
+const STARTING_BALANCE = 500;
+const EARN_AMOUNT = 100;
+
+// ==================================================
+// CONFIG CHECK
+// ==================================================
+
+if (!BOT_TOKEN) {
+  console.error("❌ BOT_TOKEN missing");
+  process.exit(1);
 }
 
-// Supabase helper functions using native fetch
-async function getUser(chatId) {
-    try {
-        const res = await fetch(`${supabaseUrl}/rest/v1/users?chat_id=eq.${chatId}&select=*`, {
-            headers: {
-                'apikey': supabaseKey,
-                'Authorization': `Bearer ${supabaseKey}`
-            }
-        });
-        const data = await res.json();
-        return data.length > 0 ? data[0] : null;
-    } catch (e) {
-        console.error('Supabase fetch error:', e);
-        return null;
-    }
+if (!SUPABASE_SERVICE_ROLE_KEY) {
+  console.error(
+    "❌ SUPABASE_SERVICE_ROLE_KEY missing"
+  );
+  process.exit(1);
 }
 
-async function createUser(chatId) {
-    try {
-        await fetch(`${supabaseUrl}/rest/v1/users`, {
-            method: 'POST',
-            headers: {
-                'apikey': supabaseKey,
-                'Authorization': `Bearer ${supabaseKey}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify({ chat_id: chatId, balance: 500 })
-        });
-        return { balance: 500 };
-    } catch (e) {
-        console.error('Supabase create error:', e);
-        return { balance: 500 };
-    }
-}
+console.log("🌌 USDT Galaxy starting...");
 
-async function updateUserBalance(chatId, balance) {
-    try {
-        await fetch(`${supabaseUrl}/rest/v1/users?chat_id=eq.${chatId}`, {
-            method: 'PATCH',
-            headers: {
-                'apikey': supabaseKey,
-                'Authorization': `Bearer ${supabaseKey}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify({ balance: balance })
-        });
-    } catch (e) {
-        console.error('Supabase update error:', e);
-    }
-}
+// ==================================================
+// BOT
+// ==================================================
 
-async function handleTelegramUpdate(msg) {
-    if (!msg || !msg.chat) return;
-    const chatId = msg.chat.id.toString();
-    const text = msg.text;
-    const userName = msg.from.first_name || 'Commander';
+const bot =
+  new TelegramBot(BOT_TOKEN);
 
-    let user = await getUser(chatId);
+// ==================================================
+// SUPABASE REQUEST
+// ==================================================
 
-    if (!user) {
-        user = await createUser(chatId);
-    }
+async function supabaseRequest(
+  path,
+  options = {}
+) {
 
-    if (text && text.startsWith('/start')) {
-        bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...getMainMenu(chatId) });
-        return;
-    }
+  const response =
+    await fetch(
+      `${SUPABASE_URL}${path}`,
+      {
+        ...options,
 
-    if (!text) return;
+        headers: {
+          apikey:
+            SUPABASE_SERVICE_ROLE_KEY,
 
-    let currentBal = user.balance !== undefined ? user.balance : 500;
-    let usdtVal = (currentBal * 0.0001).toFixed(2);
+          Authorization:
+            `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
 
-    if (text === "🌌 My Profile") {
-        bot.sendMessage(chatId, `👤 **Commander Profile**\n\n🪙 **Galaxy Tokens:** ${currentBal}\n💵 **USDT Value:** ≈ $${usdtVal}\n\n*Status: Active*`, { parse_mode: "Markdown" });
-    }
-    else if (text === "🛸 Invite Crew") {
-        bot.sendMessage(chatId, `🛸 **Recruit & Earn**\n\nBuild your crew! Earn **100 GALAXY ($0.01 USDT)** for every valid recruit.\n\n🚀 Your Transmission Link:\n\`https://t.me/${botUsername}?start=${msg.from.id}\``, { parse_mode: "Markdown" });
-    }
-    else if (text === "💳 Payout (USDT)") {
-        bot.sendMessage(chatId, `🏦 **USDT Treasury (BEP-20)**\n\n🪙 Your Balance: ${currentBal} GALAXY\n🔒 **Threshold:** 700 GALAXY ($0.07 USDT)\n\n🧾 **Live Payout Proofs:** ${paymentChannel}`);
-    }
-}
+          "Content-Type":
+            "application/json",
 
-function getMainMenu(userId) {
-    return {
-        reply_markup: {
-            keyboard: [
-                [{ text: "🌌 My Profile" }, { text: "🛸 Invite Crew" }],
-                [{ text: "💳 Payout (USDT)" }, { text: "🎬 Watch & Earn", web_app: { url: `${webAppUrl}?userid=${userId}` } }]
-            ],
-            resize_keyboard: true,
-            is_persistent: true
+          ...(options.headers || {})
         }
-    };
+      }
+    );
+
+  const text =
+    await response.text();
+
+  let data = null;
+
+  try {
+    data =
+      text
+        ? JSON.parse(text)
+        : null;
+  } catch {
+    data = text;
+  }
+
+  if (!response.ok) {
+
+    console.error(
+      "Supabase error:",
+      response.status,
+      data
+    );
+
+    throw new Error(
+      `Supabase ${response.status}`
+    );
+  }
+
+  return data;
 }
 
-const server = http.createServer((req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+// ==================================================
+// GET USER
+// ==================================================
 
-    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+async function getUser(chatId) {
 
-    if (req.url === '/' || req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Bot Webhook Server is running!');
-        return;
+  const data =
+    await supabaseRequest(
+      `/rest/v1/users?chat_id=eq.${encodeURIComponent(
+        chatId
+      )}&select=*`
+    );
+
+  return (
+    data &&
+    data.length
+  )
+    ? data[0]
+    : null;
+}
+
+// ==================================================
+// CREATE USER
+// ==================================================
+
+async function createUser(
+  chatId
+) {
+
+  try {
+
+    const data =
+      await supabaseRequest(
+        "/rest/v1/users",
+        {
+          method: "POST",
+
+          headers: {
+            Prefer:
+              "return=representation"
+          },
+
+          body:
+            JSON.stringify({
+              chat_id:
+                chatId,
+
+              balance:
+                STARTING_BALANCE
+            })
+        }
+      );
+
+    return (
+      data &&
+      data.length
+    )
+      ? data[0]
+      : null;
+
+  } catch (error) {
+
+    console.error(
+      "Create user error:",
+      error
+    );
+
+    return await getUser(
+      chatId
+    );
+  }
+}
+
+// ==================================================
+// ENSURE USER
+// ==================================================
+
+async function ensureUser(
+  chatId
+) {
+
+  let user =
+    await getUser(
+      chatId
+    );
+
+  if (!user) {
+
+    user =
+      await createUser(
+        chatId
+      );
+
+  }
+
+  return user;
+}
+
+// ==================================================
+// VERIFY TELEGRAM INIT DATA
+// ==================================================
+
+function verifyTelegramInitData(
+  initData
+) {
+
+  if (
+    !initData ||
+    typeof initData !== "string"
+  ) {
+    return null;
+  }
+
+  try {
+
+    const params =
+      new URLSearchParams(
+        initData
+      );
+
+    const receivedHash =
+      params.get("hash");
+
+    if (!receivedHash) {
+      return null;
     }
 
-    if (req.method === 'POST' && req.url === `/bot${token}`) {
-        let body = '';
-        req.on('data', chunk => { body += chunk.toString(); });
-        req.on('end', () => {
-            try {
-                const update = JSON.parse(body);
-                if (update.message) {
-                    handleTelegramUpdate(update.message);
-                }
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ status: 'ok' }));
-            } catch (e) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Invalid payload' }));
+    params.delete("hash");
+
+    const dataCheckString =
+      [...params.entries()]
+        .sort(
+          ([a], [b]) =>
+            a.localeCompare(b)
+        )
+        .map(
+          ([key, value]) =>
+            `${key}=${value}`
+        )
+        .join("\n");
+
+    const secretKey =
+      crypto
+        .createHmac(
+          "sha256",
+          "WebAppData"
+        )
+        .update(
+          BOT_TOKEN
+        )
+        .digest();
+
+    const calculatedHash =
+      crypto
+        .createHmac(
+          "sha256",
+          secretKey
+        )
+        .update(
+          dataCheckString
+        )
+        .digest("hex");
+
+    if (
+      calculatedHash !==
+      receivedHash
+    ) {
+
+      console.error(
+        "❌ Telegram hash mismatch"
+      );
+
+      return null;
+    }
+
+    const authDate =
+      Number(
+        params.get(
+          "auth_date"
+        )
+      );
+
+    if (!authDate) {
+      return null;
+    }
+
+    const age =
+      Math.floor(
+        Date.now() / 1000
+      ) - authDate;
+
+    // Session older than 24 hours
+    if (age > 86400) {
+
+      console.error(
+        "❌ Telegram initData expired"
+      );
+
+      return null;
+    }
+
+    const userString =
+      params.get("user");
+
+    if (!userString) {
+
+      console.error(
+        "❌ Telegram user missing"
+      );
+
+      return null;
+    }
+
+    const telegramUser =
+      JSON.parse(
+        userString
+      );
+
+    if (
+      !telegramUser.id
+    ) {
+      return null;
+    }
+
+    return telegramUser;
+
+  } catch (error) {
+
+    console.error(
+      "Telegram verification error:",
+      error
+    );
+
+    return null;
+  }
+}
+
+// ==================================================
+// /START
+// BOT DOES ONLY ONE THING:
+// OPEN MINI APP
+// ==================================================
+
+async function handleStart(
+  msg
+) {
+
+  const chatId =
+    msg.chat.id;
+
+  console.log(
+    `📲 /start from ${chatId}`
+  );
+
+  await bot.sendMessage(
+    chatId,
+
+    "🌌 *USDT Galaxy*\n\n🚀 Open the Mini App to access your Galaxy account.",
+
+    {
+      parse_mode:
+        "Markdown",
+
+      reply_markup: {
+
+        inline_keyboard: [
+
+          [
+
+            {
+              text:
+                "🚀 Open USDT Galaxy",
+
+              web_app: {
+                url:
+                  WEB_APP_URL
+              }
             }
-        });
-        return;
-    }
 
-    if (req.method === 'POST' && req.url === '/sync') {
-        let body = '';
-        req.on('data', chunk => { body += chunk.toString(); });
-        let parsedData = {};
-        try {
-            parsedData = JSON.parse(body);
-        } catch (e) {}
-        
-        req.on('end', async () => {
+          ]
+
+        ]
+
+      }
+    }
+  );
+}
+
+// ==================================================
+// HTTP SERVER
+// ==================================================
+
+const server =
+  http.createServer(
+    (req, res) => {
+
+      // ------------------------------------------------
+      // CORS
+      // ------------------------------------------------
+
+      res.setHeader(
+        "Access-Control-Allow-Origin",
+        "*"
+      );
+
+      res.setHeader(
+        "Access-Control-Allow-Methods",
+        "GET, POST, OPTIONS"
+      );
+
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type"
+      );
+
+      // ------------------------------------------------
+      // OPTIONS
+      // ------------------------------------------------
+
+      if (
+        req.method ===
+        "OPTIONS"
+      ) {
+
+        res.writeHead(
+          204
+        );
+
+        res.end();
+
+        return;
+      }
+
+      // ------------------------------------------------
+      // HEALTH
+      // ------------------------------------------------
+
+      if (
+        req.method === "GET" &&
+        (
+          req.url === "/" ||
+          req.url === "/health"
+        )
+      ) {
+
+        res.writeHead(
+          200,
+          {
+            "Content-Type":
+              "application/json"
+          }
+        );
+
+        res.end(
+          JSON.stringify({
+            status:
+              "ok",
+
+            app:
+              "USDT Galaxy"
+          })
+        );
+
+        return;
+      }
+
+      // ------------------------------------------------
+      // TELEGRAM WEBHOOK
+      // ------------------------------------------------
+
+      if (
+        req.method === "POST" &&
+        req.url ===
+          `/bot${BOT_TOKEN}`
+      ) {
+
+        let body = "";
+
+        req.on(
+          "data",
+          chunk => {
+
+            body +=
+              chunk.toString();
+
+          }
+        );
+
+        req.on(
+          "end",
+          async () => {
+
             try {
-                if (parsedData.userId && parsedData.balance !== undefined) {
-                    const chatIdStr = parsedData.userId.toString();
-                    let existing = await getUser(chatIdStr);
-                    if (existing) {
-                        await updateUserBalance(chatIdStr, parsedData.balance);
-                    } else {
-                        await createUser(chatIdStr);
-                        await updateUserBalance(chatIdStr, parsedData.balance);
-                    }
-                    
-                    bot.sendMessage(chatIdStr, `🔄 **Auto-Sync:** Your balance is updated to ${parsedData.balance} GALAXY in Supabase. ✅`, { parse_mode: "Markdown" });
-                    
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ success: true }));
-                } else {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Missing data' }));
+
+              const update =
+                JSON.parse(
+                  body
+                );
+
+              if (
+                update.message &&
+                update.message.text &&
+                update.message.text
+                  .startsWith(
+                    "/start"
+                  )
+              ) {
+
+                await handleStart(
+                  update.message
+                );
+
+              }
+
+              res.writeHead(
+                200,
+                {
+                  "Content-Type":
+                    "application/json"
                 }
-            } catch (e) { 
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Server error' })); 
+              );
+
+              res.end(
+                JSON.stringify({
+                  ok:
+                    true
+                })
+              );
+
+            } catch (error) {
+
+              console.error(
+                "Webhook error:",
+                error
+              );
+
+              res.writeHead(
+                200,
+                {
+                  "Content-Type":
+                    "application/json"
+                }
+              );
+
+              res.end(
+                JSON.stringify({
+                  ok:
+                    false
+                })
+              );
             }
-        });
+
+          }
+        );
+
         return;
+      }
+
+      // ------------------------------------------------
+      // SYNC
+      // ------------------------------------------------
+
+      if (
+        req.method === "POST" &&
+        req.url === "/sync"
+      ) {
+
+        let body = "";
+
+        req.on(
+          "data",
+          chunk => {
+
+            body +=
+              chunk.toString();
+
+          }
+        );
+
+        req.on(
+          "end",
+          async () => {
+
+            try {
+
+              const parsed =
+                JSON.parse(
+                  body
+                );
+
+              const telegramUser =
+                verifyTelegramInitData(
+                  parsed.initData
+                );
+
+              if (
+                !telegramUser
+              ) {
+
+                res.writeHead(
+                  401,
+                  {
+                    "Content-Type":
+                      "application/json"
+                  }
+                );
+
+                res.end(
+                  JSON.stringify({
+                    success:
+                      false,
+
+                    error:
+                      "INVALID_TELEGRAM_SESSION"
+                  })
+                );
+
+                return;
+              }
+
+              const chatId =
+                telegramUser.id.toString();
+
+              const user =
+                await ensureUser(
+                  chatId
+                );
+
+              if (!user) {
+
+                throw new Error(
+                  "USER_NOT_FOUND"
+                );
+              }
+
+              console.log(
+                `✅ Sync user ${chatId} balance ${user.balance}`
+              );
+
+              res.writeHead(
+                200,
+                {
+                  "Content-Type":
+                    "application/json"
+                }
+              );
+
+              res.end(
+                JSON.stringify({
+                  success:
+                    true,
+
+                  balance:
+                    Number(
+                      user.balance ||
+                      0
+                    )
+                })
+              );
+
+            } catch (error) {
+
+              console.error(
+                "Sync error:",
+                error
+              );
+
+              res.writeHead(
+                500,
+                {
+                  "Content-Type":
+                    "application/json"
+                }
+              );
+
+              res.end(
+                JSON.stringify({
+                  success:
+                    false,
+
+                  error:
+                    "SERVER_ERROR"
+                })
+              );
+            }
+
+          }
+        );
+
+        return;
+      }
+
+      // ------------------------------------------------
+      // EARN
+      // ------------------------------------------------
+
+      if (
+        req.method === "POST" &&
+        req.url === "/earn"
+      ) {
+
+        let body = "";
+
+        req.on(
+          "data",
+          chunk => {
+
+            body +=
+              chunk.toString();
+
+          }
+        );
+
+        req.on(
+          "end",
+          async () => {
+
+            try {
+
+              const parsed =
+                JSON.parse(
+                  body
+                );
+
+              const telegramUser =
+                verifyTelegramInitData(
+                  parsed.initData
+                );
+
+              if (
+                !telegramUser
+              ) {
+
+                res.writeHead(
+                  401,
+                  {
+                    "Content-Type":
+                      "application/json"
+                  }
+                );
+
+                res.end(
+                  JSON.stringify({
+                    success:
+                      false,
+
+                    error:
+                      "INVALID_TELEGRAM_SESSION"
+                  })
+                );
+
+                return;
+              }
+
+              const allowedTasks = [
+                "video1",
+                "video2",
+                "video3"
+              ];
+
+              if (
+                !allowedTasks.includes(
+                  parsed.taskId
+                )
+              ) {
+
+                res.writeHead(
+                  400,
+                  {
+                    "Content-Type":
+                      "application/json"
+                  }
+                );
+
+                res.end(
+                  JSON.stringify({
+                    success:
+                      false,
+
+                    error:
+                      "INVALID_TASK"
+                  })
+                );
+
+                return;
+              }
+
+              const chatId =
+                telegramUser.id.toString();
+
+              await ensureUser(
+                chatId
+              );
+
+              const result =
+                await supabaseRequest(
+                  "/rest/v1/rpc/increment_user_balance",
+                  {
+                    method:
+                      "POST",
+
+                    body:
+                      JSON.stringify({
+                        p_chat_id:
+                          chatId,
+
+                        p_amount:
+                          EARN_AMOUNT
+                      })
+                  }
+                );
+
+              const newBalance =
+                Number(
+                  result
+                );
+
+              console.log(
+                `💰 Earn ${chatId}: +${EARN_AMOUNT}, balance ${newBalance}`
+              );
+
+              res.writeHead(
+                200,
+                {
+                  "Content-Type":
+                    "application/json"
+                }
+              );
+
+              res.end(
+                JSON.stringify({
+
+                  success:
+                    true,
+
+                  balance:
+                    newBalance,
+
+                  earned:
+                    EARN_AMOUNT
+
+                })
+              );
+
+            } catch (error) {
+
+              console.error(
+                "Earn error:",
+                error
+              );
+
+              res.writeHead(
+                500,
+                {
+                  "Content-Type":
+                    "application/json"
+                }
+              );
+
+              res.end(
+                JSON.stringify({
+
+                  success:
+                    false,
+
+                  error:
+                    "EARN_FAILED"
+
+                })
+              );
+            }
+
+          }
+        );
+
+        return;
+      }
+
+      // ------------------------------------------------
+      // NOT FOUND
+      // ------------------------------------------------
+
+      res.writeHead(
+        404,
+        {
+          "Content-Type":
+            "application/json"
+        }
+      );
+
+      res.end(
+        JSON.stringify({
+          error:
+            "Not Found"
+        })
+      );
+
+    }
+  );
+
+// ==================================================
+// START SERVER
+// ==================================================
+
+const PORT =
+  process.env.PORT ||
+  10000;
+
+server.listen(
+  PORT,
+  async () => {
+
+    console.log(
+      `🚀 Server running on port ${PORT}`
+    );
+
+    try {
+
+      // Remove old webhook
+      await bot.deleteWebHook();
+
+      console.log(
+        "🧹 Old webhook removed"
+      );
+
+      // Set fresh webhook
+      const webhookUrl =
+        `${BACKEND_URL}/bot${BOT_TOKEN}`;
+
+      await bot.setWebHook(
+        webhookUrl
+      );
+
+      console.log(
+        "✅ Telegram webhook configured"
+      );
+
+      console.log(
+        "🌌 USDT Galaxy bot ready"
+      );
+
+    } catch (error) {
+
+      console.error(
+        "❌ Webhook setup error:",
+        error
+      );
     }
 
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not found');
-});
-
-const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => { console.log(`Server running on port ${PORT}`); });
+  }
+);
