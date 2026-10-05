@@ -1,28 +1,36 @@
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
-const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
 
-const mongoURI = process.env.MONGO_URI || 'mongodb+srv://bhullar241:Lovepreet241@bhullar.jjzhl1x.mongodb.net/galaxybot?retryWrites=true&w=majority&appName=Bhullar';
+const dbFile = path.join(__dirname, 'database.json');
 
-mongoose.connect(mongoURI)
-    .then(() => console.log('✅ MongoDB Connected! Database is Live.'))
-    .catch(err => console.error('❌ MongoDB Error:', err));
+// Local JSON Database functions
+function loadDb() {
+    try {
+        if (!fs.existsSync(dbFile)) {
+            fs.writeFileSync(dbFile, JSON.stringify({}));
+        }
+        const data = fs.readFileSync(dbFile, 'utf8');
+        return JSON.parse(data);
+    } catch (e) {
+        return {};
+    }
+}
 
-const userSchema = new mongoose.Schema({
-    userId: { type: String, required: true, unique: true },
-    balance: { type: Number, default: 500 }
-});
-const User = mongoose.model('User', userSchema);
+function saveDb(data) {
+    try {
+        fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
+    } catch (e) {}
+}
 
 const token = '8996114363:AAG6KZtjbzgI8H7mceyKECWD5Yng29TXudQ';
 const webAppUrl = 'https://airdropnewmera.vercel.app/'; 
 const botUsername = 'USDTGalaxyProRobot'; 
 const paymentChannel = '@usdt_GalaxyPayments'; 
 
-// 🛑 Polling hata kar Webhook mode set kar rahe hain
 const bot = new TelegramBot(token);
 
-// Railway ka static domain automatically detect karega
 const railwayUrl = process.env.RAILWAY_STATIC_URL ? `https://${process.env.RAILWAY_STATIC_URL}` : process.env.WEBHOOK_URL;
 
 if (railwayUrl) {
@@ -37,38 +45,31 @@ async function handleTelegramUpdate(msg) {
     const text = msg.text;
     const userName = msg.from.first_name || 'Commander';
 
+    let db = loadDb();
+
     if (text && text.startsWith('/start')) {
-        try {
-            let user = await User.findOne({ userId: chatId });
-            if (!user) {
-                user = new User({ userId: chatId, balance: 500 }); 
-                await user.save();
-            }
-            bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...getMainMenu(chatId) });
-        } catch (err) {
-            bot.sendMessage(chatId, "⚠️ Server error. Please try again.");
+        if (!db[chatId]) {
+            db[chatId] = { balance: 500 };
+            saveDb(db);
         }
+        bot.sendMessage(chatId, `🚀 **Welcome to USDT Galaxy, ${userName}!**\n\nYour account is active. Use the terminal below to navigate your dashboard.`, { parse_mode: "Markdown", ...getMainMenu(chatId) });
         return;
     }
 
     if (!text) return;
 
-    try {
-        let user = await User.findOne({ userId: chatId });
-        let currentBal = user ? user.balance : 500;
-        let usdtVal = (currentBal * 0.0001).toFixed(2);
+    let user = db[chatId] || { balance: 500 };
+    let currentBal = user.balance;
+    let usdtVal = (currentBal * 0.0001).toFixed(2);
 
-        if (text === "🌌 My Profile") {
-            bot.sendMessage(chatId, `👤 **Commander Profile**\n\n🪙 **Galaxy Tokens:** ${currentBal}\n💵 **USDT Value:** ≈ $${usdtVal}\n\n*Status: Active*`, { parse_mode: "Markdown" });
-        }
-        else if (text === "🛸 Invite Crew") {
-            bot.sendMessage(chatId, `🛸 **Recruit & Earn**\n\nBuild your crew! Earn **100 GALAXY ($0.01 USDT)** for every valid recruit.\n\n🚀 Your Transmission Link:\n\`https://t.me/${botUsername}?start=${msg.from.id}\``, { parse_mode: "Markdown" });
-        }
-        else if (text === "💳 Payout (USDT)") {
-            bot.sendMessage(chatId, `🏦 **USDT Treasury (BEP-20)**\n\n🪙 Your Balance: ${currentBal} GALAXY\n🔒 **Threshold:** 700 GALAXY ($0.07 USDT)\n\n🧾 **Live Payout Proofs:** ${paymentChannel}`);
-        }
-    } catch (err) {
-        console.error(err);
+    if (text === "🌌 My Profile") {
+        bot.sendMessage(chatId, `👤 **Commander Profile**\n\n🪙 **Galaxy Tokens:** ${currentBal}\n💵 **USDT Value:** ≈ $${usdtVal}\n\n*Status: Active*`, { parse_mode: "Markdown" });
+    }
+    else if (text === "🛸 Invite Crew") {
+        bot.sendMessage(chatId, `🛸 **Recruit & Earn**\n\nBuild your crew! Earn **100 GALAXY ($0.01 USDT)** for every valid recruit.\n\n🚀 Your Transmission Link:\n\`https://t.me/${botUsername}?start=${msg.from.id}\``, { parse_mode: "Markdown" });
+    }
+    else if (text === "💳 Payout (USDT)") {
+        bot.sendMessage(chatId, `🏦 **USDT Treasury (BEP-20)**\n\n🪙 Your Balance: ${currentBal} GALAXY\n🔒 **Threshold:** 700 GALAXY ($0.07 USDT)\n\n🧾 **Live Payout Proofs:** ${paymentChannel}`);
     }
 }
 
@@ -98,7 +99,6 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // Telegram Webhook Endpoint
     if (req.method === 'POST' && req.url === `/bot${token}`) {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
@@ -118,7 +118,6 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // Mini App Sync Endpoint
     if (req.method === 'POST' && req.url === '/sync') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
@@ -130,11 +129,10 @@ const server = http.createServer((req, res) => {
         req.on('end', async () => {
             try {
                 if (parsedData.userId && parsedData.balance !== undefined) {
-                    await User.findOneAndUpdate(
-                        { userId: parsedData.userId.toString() },
-                        { balance: parsedData.balance },
-                        { new: true, upsert: true }
-                    );
+                    let db = loadDb();
+                    if (!db[parsedData.userId]) db[parsedData.userId] = {};
+                    db[parsedData.userId].balance = parsedData.balance;
+                    saveDb(db);
                     
                     bot.sendMessage(parsedData.userId, `🔄 **Auto-Sync:** Your balance is updated to ${parsedData.balance} GALAXY in the database. ✅`, { parse_mode: "Markdown" });
                     
