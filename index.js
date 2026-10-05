@@ -426,6 +426,40 @@ async function createUser(
           }
         );
 
+        // ====================================================
+        // REFERRAL COUNT
+        // ====================================================
+
+        try {
+          await supabaseFetch(
+            `/rest/v1/rpc/increment_referral_count`,
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+                  p_chat_id:
+                    String(
+                      referralCode
+                    ),
+                }),
+            }
+          );
+
+          console.log(
+            `Referral count incremented for ${referralCode}`
+          );
+        } catch (err) {
+          console.error(
+            "Referral count error:",
+            err.message
+          );
+        }
+
+        // ====================================================
+        // REFERRAL REWARD
+        // ====================================================
+
         try {
           await supabaseFetch(
             `/rest/v1/rpc/increment_user_balance`,
