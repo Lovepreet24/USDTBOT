@@ -6,7 +6,8 @@ const crypto = require("crypto");
 // CONFIG
 // =====================================================
 
-const BOT_TOKEN = process.env.BOT_TOKEN || "8996114363:AAGUHD9Yi4AZ_kFYYw9O9uAWJuPlaziuJDo";
+const BOT_TOKEN =
+  process.env.BOT_TOKEN || "8996114363:AAGUHD9Yi4AZ_kFYYw9O9uAWJuPlaziuJDo";
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL ||
@@ -53,20 +54,23 @@ const bot = new TelegramBot(BOT_TOKEN);
 // =====================================================
 
 async function supabaseRequest(path, options = {}) {
-  const response = await fetch(`${SUPABASE_URL}${path}`, {
-    ...options,
+  const response = await fetch(
+    `${SUPABASE_URL}${path}`,
+    {
+      ...options,
 
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
 
-      Authorization:
-        `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        Authorization:
+          `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
 
-      "Content-Type": "application/json",
+        "Content-Type": "application/json",
 
-      ...(options.headers || {})
+        ...(options.headers || {})
+      }
     }
-  });
+  );
 
   const text = await response.text();
 
@@ -85,7 +89,9 @@ async function supabaseRequest(path, options = {}) {
       data
     );
 
-    throw new Error(`Supabase ${response.status}`);
+    throw new Error(
+      `Supabase ${response.status}`
+    );
   }
 
   return data;
@@ -170,9 +176,8 @@ function verifyTelegramInitData(initData) {
   }
 
   try {
-    const params = new URLSearchParams(
-      initData
-    );
+    const params =
+      new URLSearchParams(initData);
 
     const receivedHash =
       params.get("hash");
@@ -287,8 +292,7 @@ async function handleStart(msg) {
     `📲 /start from ${chatId}`
   );
 
-  // Remove old reply keyboard if one
-  // was previously created by the old bot.
+  // Remove old reply keyboard.
   try {
     const cleanup =
       await bot.sendMessage(
@@ -301,8 +305,7 @@ async function handleStart(msg) {
         }
       );
 
-    // Delete cleanup message so the bot
-    // remains clean.
+    // Delete temporary cleanup message.
     try {
       await bot.deleteMessage(
         chatId,
@@ -357,9 +360,9 @@ const server =
   http.createServer(
     (req, res) => {
 
-      // -------------------------------------------------
+      // =================================================
       // CORS
-      // -------------------------------------------------
+      // =================================================
 
       res.setHeader(
         "Access-Control-Allow-Origin",
@@ -376,9 +379,9 @@ const server =
         "Content-Type"
       );
 
-      // -------------------------------------------------
+      // =================================================
       // OPTIONS
-      // -------------------------------------------------
+      // =================================================
 
       if (req.method === "OPTIONS") {
         res.writeHead(204);
@@ -386,9 +389,9 @@ const server =
         return;
       }
 
-      // -------------------------------------------------
+      // =================================================
       // HEALTH CHECK
-      // -------------------------------------------------
+      // =================================================
 
       if (
         req.method === "GET" &&
@@ -415,21 +418,20 @@ const server =
         return;
       }
 
-      // -------------------------------------------------
+      // =================================================
       // TELEGRAM WEBHOOK
-      // -------------------------------------------------
+      // =================================================
 
       if (
         req.method === "POST" &&
         req.url ===
           `/bot${BOT_TOKEN}`
       ) {
-
         let body = "";
 
         req.on(
           "data",
-          chunk => {
+          (chunk) => {
             body += chunk.toString();
           }
         );
@@ -437,12 +439,10 @@ const server =
         req.on(
           "end",
           async () => {
-
             try {
               const update =
                 JSON.parse(body);
 
-              // Only handle /start.
               if (
                 update.message &&
                 update.message.text &&
@@ -470,7 +470,6 @@ const server =
               );
 
             } catch (error) {
-
               console.error(
                 "Webhook error:",
                 error
@@ -504,12 +503,11 @@ const server =
         req.method === "POST" &&
         req.url === "/sync"
       ) {
-
         let body = "";
 
         req.on(
           "data",
-          chunk => {
+          (chunk) => {
             body += chunk.toString();
           }
         );
@@ -517,7 +515,6 @@ const server =
         req.on(
           "end",
           async () => {
-
             try {
               const parsed =
                 JSON.parse(body);
@@ -528,7 +525,6 @@ const server =
                 );
 
               if (!telegramUser) {
-
                 res.writeHead(
                   401,
                   {
@@ -571,12 +567,13 @@ const server =
                 {
                   "Content-Type":
                     "application/json"
-                }
+                  }
               );
 
               res.end(
                 JSON.stringify({
                   success: true,
+
                   balance:
                     Number(
                       user.balance || 0
@@ -585,7 +582,6 @@ const server =
               );
 
             } catch (error) {
-
               console.error(
                 "Sync error:",
                 error
@@ -596,8 +592,8 @@ const server =
                 {
                   "Content-Type":
                     "application/json"
-                }
-              );
+                  }
+                );
 
               res.end(
                 JSON.stringify({
@@ -621,12 +617,11 @@ const server =
         req.method === "POST" &&
         req.url === "/earn"
       ) {
-
         let body = "";
 
         req.on(
           "data",
-          chunk => {
+          (chunk) => {
             body += chunk.toString();
           }
         );
@@ -634,7 +629,6 @@ const server =
         req.on(
           "end",
           async () => {
-
             try {
               const parsed =
                 JSON.parse(body);
@@ -645,7 +639,6 @@ const server =
                 );
 
               if (!telegramUser) {
-
                 res.writeHead(
                   401,
                   {
@@ -665,7 +658,7 @@ const server =
                 return;
               }
 
-              // Allowed video tasks.
+              // Allowed tasks.
               const allowedTasks = [
                 "video1",
                 "video2",
@@ -677,7 +670,6 @@ const server =
                   parsed.taskId
                 )
               ) {
-
                 res.writeHead(
                   400,
                   {
@@ -704,8 +696,7 @@ const server =
                 chatId
               );
 
-              // Increment balance
-              // through Supabase RPC.
+              // Increase balance.
               const result =
                 await supabaseRequest(
                   "/rest/v1/rpc/increment_user_balance",
@@ -751,7 +742,6 @@ const server =
               );
 
             } catch (error) {
-
               console.error(
                 "Earn error:",
                 error
@@ -779,9 +769,9 @@ const server =
         return;
       }
 
-      // -------------------------------------------------
-      // NOT FOUND
-      // -------------------------------------------------
+      // =================================================
+      // 404
+      // =================================================
 
       res.writeHead(
         404,
@@ -815,15 +805,14 @@ server.listen(
     );
 
     try {
-
-      // Remove any old Telegram webhook.
+      // Remove old webhook.
       await bot.deleteWebHook();
 
       console.log(
         "🧹 Old webhook removed"
       );
 
-      // Set new webhook.
+      // Configure new webhook.
       const webhookUrl =
         `${BACKEND_URL}/bot${BOT_TOKEN}`;
 
@@ -840,8 +829,10 @@ server.listen(
       );
 
     } catch (error) {
-
       console.error(
         "❌ Webhook setup error:",
-        error }
-});
+        error
+      );
+    }
+  }
+);
