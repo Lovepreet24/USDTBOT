@@ -1,0 +1,13 @@
+{
+  "name": "USDTBot",
+  "version": "1.0.0",
+  "description": "USDT Galaxy Telegram Bot and Backend",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "mongoose": "^8.0.0",
+    "node-telegram-bot-api": "^0.61.0"
+  }
+}
