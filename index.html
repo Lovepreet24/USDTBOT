@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USDT Galaxy Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 400px;
+            margin: 40px auto;
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        h2 { color: #38bdf8; }
+        .balance-box {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #4ade80;
+        }
+        button {
+            background-color: #38bdf8;
+            color: #0f172a;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        button:active { background-color: #0ea5e9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🚀 USDT Galaxy</h2>
+        <p>Commander Dashboard</p>
+        
+        <div class="balance-box">
+            🪙 <span id="balance">500</span> GALAXY
+        </div>
+        
+        <button onclick="earnToken()">Watch & Earn (+50)</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        // URL se userId nikalna
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('userid') || '123456';
+
+        let currentBalance = 500;
+
+        function earnToken() {
+            currentBalance += 50;
+            document.getElementById('balance').innerText = currentBalance;
+
+            // Server ko balance sync karna
+            fetch('/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: userId, balance: currentBalance })
+            }).then(res => res.json()).then(data => {
+                console.log('Synced successfully:', data);
+            }).catch(err => console.error('Sync error:', err));
+        }
+    </script>
+</body>
+</html>
