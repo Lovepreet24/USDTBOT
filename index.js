@@ -57,9 +57,12 @@ const BSC_USDT_CONTRACT =
 
 const JOINING_BONUS = 500;
 const REFERRAL_REWARD = 100;
-const TASK_REWARD = 100;
 
-const MIN_WITHDRAWAL = 700;
+// Changed: each video reward = 50 GALAXY
+const TASK_REWARD = 50;
+
+// Changed: minimum withdrawal = 500 GALAXY
+const MIN_WITHDRAWAL = 500;
 
 const GALAXY_PER_USDT = 10000;
 
