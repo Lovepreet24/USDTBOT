@@ -1,11 +1,10 @@
 const TelegramBot = require("node-telegram-bot-api");
 const http = require("http");
 const crypto = require("crypto");
-const { ethers } = require("ethers");
 
-// ============================================================
+// ==================================================
 // CONFIG
-// ============================================================
+// ==================================================
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
@@ -16,9 +15,9 @@ const SUPABASE_URL =
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// ============================================================
-// GALAXY TOKEN WEB APP
-// ============================================================
+// ==================================================
+// WEB APP
+// ==================================================
 
 const WEB_APP_URL =
   "https://usdtgalaxypro.vercel.app/";
@@ -27,58 +26,31 @@ const BACKEND_URL =
   process.env.BACKEND_URL ||
   "https://usdtbot-production-89e9.up.railway.app";
 
+// Admin secret for manually processing withdrawals.
+// Add ADMIN_SECRET in Railway Variables.
 const ADMIN_SECRET =
   process.env.ADMIN_SECRET;
 
-// ============================================================
-// BSC AUTO PAYOUT
-// ============================================================
-
-const AUTO_PAYOUT =
-  String(
-    process.env.AUTO_PAYOUT || "true"
-  ).toLowerCase() === "true";
-
-const BSC_RPC_URL =
-  process.env.BSC_RPC_URL ||
-  "https://bsc-dataseed.bnbchain.org";
-
-const PAYOUT_WALLET =
-  process.env.PAYOUT_WALLET ||
-  "0xBe4fd4aB459A6b0CefDAE1e9BCc4d88d8B91E16c";
-
-// IMPORTANT:
-// Put the real private key ONLY in Railway Variables.
-// Never put the real private key directly in this file.
-const PAYOUT_PRIVATE_KEY =
-  process.env.PAYOUT_PRIVATE_KEY || "";
-
-const BSC_USDT_CONTRACT =
-  process.env.BSC_USDT_CONTRACT ||
-  "0x55d398326f99059ff775485246999027b3197955";
-
-// ============================================================
+// ==================================================
 // REWARDS
-// ============================================================
+// ==================================================
 
-const JOINING_BONUS = 500;
+const STARTING_BALANCE = 500; // 500 GALAXY = $0.05 USDT
 
-const REFERRAL_REWARD = 100;
+const REFERRAL_REWARD = 100; // 100 GALAXY = $0.01 USDT
 
-// Each YouTube task = 50 GALAXY
-const TASK_REWARD = 50;
+const EARN_AMOUNT = 50; // 50 GALAXY = $0.005 USDT
 
-// Minimum withdrawal = 500 GALAXY
-const MIN_WITHDRAWAL = 500;
+const MIN_WITHDRAWAL = 500; // 500 GALAXY = $0.05 USDT
 
 const GALAXY_PER_USDT = 10000;
 
 const TASK_COOLDOWN_MS =
   24 * 60 * 60 * 1000;
 
-// ============================================================
-// CHANNELS
-// ============================================================
+// ==================================================
+// TELEGRAM CHANNELS
+// ==================================================
 
 const MAIN_CHANNEL =
   "@USDTGalaxyOfficial";
@@ -86,45 +58,36 @@ const MAIN_CHANNEL =
 const PAYMENT_CHANNEL =
   "@usdt_GalaxyPayments";
 
-// ============================================================
-// TASKS
-// ============================================================
+// ==================================================
+// YOUTUBE TASKS
+// ==================================================
 
-const TASKS = {
-  video1: {
-    url:
-      "https://youtu.be/unTAEBvggus",
-
-    reward:
-      TASK_REWARD,
+const YOUTUBE_TASKS = [
+  {
+    id: "video1",
+    url: "https://youtu.be/unTAEBvggus",
+    reward: EARN_AMOUNT
   },
 
-  video2: {
-    url:
-      "https://youtu.be/Hja_iwEkfmI",
-
-    reward:
-      TASK_REWARD,
+  {
+    id: "video2",
+    url: "https://youtu.be/Hja_iwEkfmI",
+    reward: EARN_AMOUNT
   },
 
-  video3: {
-    url:
-      "https://youtu.be/I5mLBbsuAdA",
+  {
+    id: "video3",
+    url: "https://youtu.be/I5mLBbsuAdA",
+    reward: EARN_AMOUNT
+  }
+];
 
-    reward:
-      TASK_REWARD,
-  },
-};
-
-// ============================================================
-// BOT CHECK
-// ============================================================
+// ==================================================
+// CONFIG CHECK
+// ==================================================
 
 if (!BOT_TOKEN) {
-  console.error(
-    "❌ BOT_TOKEN missing"
-  );
-
+  console.error("❌ BOT_TOKEN missing");
   process.exit(1);
 }
 
@@ -136,82 +99,28 @@ if (!SUPABASE_SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-// ============================================================
-// BOT
-// ============================================================
-
-const bot =
-  new TelegramBot(
-    BOT_TOKEN,
-    {
-      polling: false,
-    }
+if (!ADMIN_SECRET) {
+  console.warn(
+    "⚠️ ADMIN_SECRET missing. Admin payout endpoint will be disabled."
   );
-
-// ============================================================
-// BSC
-// ============================================================
-
-let bscProvider = null;
-
-let payoutSigner = null;
-
-let usdtContract = null;
-
-const ERC20_ABI = [
-  "function transfer(address to, uint256 amount) returns (bool)",
-
-  "function decimals() view returns (uint8)",
-
-  "function balanceOf(address account) view returns (uint256)",
-];
-
-function initBSC() {
-  try {
-    bscProvider =
-      new ethers.JsonRpcProvider(
-        BSC_RPC_URL
-      );
-
-    if (
-      PAYOUT_PRIVATE_KEY
-    ) {
-      payoutSigner =
-        new ethers.Wallet(
-          PAYOUT_PRIVATE_KEY,
-          bscProvider
-        );
-
-      usdtContract =
-        new ethers.Contract(
-          BSC_USDT_CONTRACT,
-          ERC20_ABI,
-          payoutSigner
-        );
-
-      console.log(
-        "✅ BSC payout signer initialized"
-      );
-    } else {
-      console.log(
-        "⚠️ PAYOUT_PRIVATE_KEY not configured yet"
-      );
-    }
-  } catch (err) {
-    console.error(
-      "❌ BSC initialization error:",
-      err.message
-    );
-  }
 }
 
-initBSC();
+console.log(
+  "🌌 Galaxy Token starting..."
+);
 
-// ============================================================
-// SUPABASE
-// ============================================================
+// ==================================================
+// BOT
+// ==================================================
 
-async function supabaseFetch(
+const bot =
+  new TelegramBot(BOT_TOKEN);
+
+// ==================================================
+// SUPABASE REQUEST
+// ==================================================
+
+async function supabaseRequest(
   path,
   options = {}
 ) {
@@ -231,57 +140,162 @@ async function supabaseFetch(
           "Content-Type":
             "application/json",
 
-          ...(options.headers || {}),
-        },
+          ...(options.headers || {})
+        }
       }
     );
 
   const text =
     await response.text();
 
-  let result;
+  let data = null;
 
   try {
-    result =
+    data =
       text
         ? JSON.parse(text)
         : null;
   } catch {
-    result = text;
+    data = text;
   }
 
   if (!response.ok) {
+    console.error(
+      "Supabase error:",
+      response.status,
+      data
+    );
+
     throw new Error(
-      typeof result === "string"
-        ? result
-        : JSON.stringify(result)
+      `Supabase ${response.status}`
     );
   }
 
-  return result;
+  return data;
 }
 
-// ============================================================
-// TELEGRAM INIT DATA
-// ============================================================
+// ==================================================
+// GET USER
+// ==================================================
 
-function validateTelegramInitData(
-  initData
+async function getUser(chatId) {
+  const data =
+    await supabaseRequest(
+      `/rest/v1/users?chat_id=eq.${encodeURIComponent(
+        chatId
+      )}&select=*`
+    );
+
+  return data && data.length
+    ? data[0]
+    : null;
+}
+
+// ==================================================
+// REGISTER USER
+//
+// New user gets 500 GALAXY.
+// If referral is valid, referrer gets 100 GALAXY.
+// ==================================================
+
+async function registerUser(
+  chatId,
+  referrerId = null
 ) {
   try {
-    if (!initData) {
-      return null;
+    const result =
+      await supabaseRequest(
+        "/rest/v1/rpc/register_user",
+        {
+          method: "POST",
+
+          body:
+            JSON.stringify({
+              p_chat_id:
+                chatId,
+
+              p_referrer_id:
+                referrerId
+                  ? String(referrerId)
+                  : null
+            })
+        }
+      );
+
+    if (
+      Array.isArray(result) &&
+      result.length
+    ) {
+      return result[0];
     }
 
+    return result;
+
+  } catch (error) {
+    console.error(
+      "Register user error:",
+      error
+    );
+
+    return await getUser(
+      chatId
+    );
+  }
+}
+
+// ==================================================
+// ENSURE USER
+// ==================================================
+
+async function ensureUser(
+  chatId
+) {
+  let user =
+    await getUser(chatId);
+
+  if (!user) {
+    user =
+      await registerUser(
+        chatId,
+        null
+      );
+  }
+
+  return user;
+}
+
+// ==================================================
+// VERIFY TELEGRAM INIT DATA
+// ==================================================
+
+function verifyTelegramInitData(
+  initData
+) {
+  if (
+    !initData ||
+    typeof initData !== "string"
+  ) {
+    console.error(
+      "❌ initData missing"
+    );
+
+    return null;
+  }
+
+  try {
     const params =
       new URLSearchParams(
         initData
       );
 
-    const hash =
+    const receivedHash =
       params.get("hash");
 
-    if (!hash) {
+    if (!receivedHash) {
+      console.error(
+        "❌ Telegram hash missing"
+      );
+
       return null;
     }
 
@@ -289,9 +303,8 @@ function validateTelegramInitData(
 
     const dataCheckString =
       [...params.entries()]
-        .sort(
-          ([a], [b]) =>
-            a.localeCompare(b)
+        .sort(([a], [b]) =>
+          a.localeCompare(b)
         )
         .map(
           ([key, value]) =>
@@ -318,771 +331,344 @@ function validateTelegramInitData(
         .digest("hex");
 
     if (
-      calculatedHash.length !==
-      hash.length
+      calculatedHash !==
+      receivedHash
     ) {
+      console.error(
+        "❌ Telegram hash mismatch"
+      );
+
       return null;
     }
+
+    const authDate =
+      Number(
+        params.get("auth_date")
+      );
+
+    if (!authDate) {
+      console.error(
+        "❌ Telegram auth_date missing"
+      );
+
+      return null;
+    }
+
+    const age =
+      Math.floor(
+        Date.now() / 1000
+      ) - authDate;
 
     if (
-      !crypto.timingSafeEqual(
-        Buffer.from(
-          calculatedHash
-        ),
-        Buffer.from(hash)
-      )
+      age < 0 ||
+      age > 86400
     ) {
+      console.error(
+        "❌ Telegram initData expired"
+      );
+
       return null;
     }
 
-    const userJson =
+    const userString =
       params.get("user");
 
-    if (!userJson) {
+    if (!userString) {
+      console.error(
+        "❌ Telegram user missing"
+      );
+
       return null;
     }
 
-    return JSON.parse(
-      userJson
-    );
-  } catch (err) {
+    const telegramUser =
+      JSON.parse(
+        userString
+      );
+
+    if (!telegramUser.id) {
+      console.error(
+        "❌ Telegram user ID missing"
+      );
+
+      return null;
+    }
+
+    return telegramUser;
+
+  } catch (error) {
     console.error(
-      "initData validation error:",
-      err.message
+      "Telegram verification error:",
+      error
     );
 
     return null;
   }
 }
 
-// ============================================================
-// USER
-// ============================================================
+// ==================================================
+// CHECK CHANNEL MEMBERSHIP
+// ==================================================
 
-async function getUser(
-  chatId
-) {
-  const data =
-    await supabaseFetch(
-      `/rest/v1/users?chat_id=eq.${encodeURIComponent(
-        String(chatId)
-      )}&select=*`
-    );
-
-  return data?.[0] || null;
-}
-
-async function createUser(
-  telegramUser,
-  referralCode = null
-) {
-  const chatId =
-    String(
-      telegramUser.id
-    );
-
-  const existing =
-    await getUser(
-      chatId
-    );
-
-  if (existing) {
-    return existing;
-  }
-
-  const payload = {
-    chat_id:
-      chatId,
-
-    first_name:
-      telegramUser.first_name ||
-      "",
-
-    last_name:
-      telegramUser.last_name ||
-      "",
-
-    username:
-      telegramUser.username ||
-      null,
-
-    balance:
-      JOINING_BONUS,
-  };
-
-  const created =
-    await supabaseFetch(
-      `/rest/v1/users`,
-      {
-        method:
-          "POST",
-
-        headers: {
-          Prefer:
-            "return=representation",
-        },
-
-        body:
-          JSON.stringify(
-            payload
-          ),
-      }
-    );
-
-  const user =
-    created?.[0] || null;
-
-  console.log(
-    `🎁 New user ${chatId}, joining bonus ${JOINING_BONUS}`
-  );
-
-  // ========================================================
-  // REFERRAL
-  // ========================================================
-
-  if (
-    user &&
-    referralCode &&
-    String(referralCode) !==
-      chatId
-  ) {
-    try {
-      const existingReferral =
-        await supabaseFetch(
-          `/rest/v1/referrals?referrer_id=eq.${encodeURIComponent(
-            String(referralCode)
-          )}&referred_id=eq.${encodeURIComponent(
-            chatId
-          )}&select=id`
-        );
-
-      if (
-        !existingReferral?.length
-      ) {
-        await supabaseFetch(
-          `/rest/v1/referrals`,
-          {
-            method:
-              "POST",
-
-            headers: {
-              Prefer:
-                "return=minimal",
-            },
-
-            body:
-              JSON.stringify({
-                referrer_id:
-                  String(
-                    referralCode
-                  ),
-
-                referred_id:
-                  chatId,
-              }),
-          }
-        );
-
-        // ====================================================
-        // REFERRAL COUNT
-        // ====================================================
-
-        try {
-          await supabaseFetch(
-            `/rest/v1/rpc/increment_referral_count`,
-            {
-              method:
-                "POST",
-
-              body:
-                JSON.stringify({
-                  p_chat_id:
-                    String(
-                      referralCode
-                    ),
-                }),
-            }
-          );
-
-          console.log(
-            `👥 Referral count incremented for ${referralCode}`
-          );
-        } catch (err) {
-          console.error(
-            "Referral count error:",
-            err.message
-          );
-        }
-
-        // ====================================================
-        // REFERRAL REWARD
-        // ====================================================
-
-        try {
-          await supabaseFetch(
-            `/rest/v1/rpc/increment_user_balance`,
-            {
-              method:
-                "POST",
-
-              body:
-                JSON.stringify({
-                  p_chat_id:
-                    String(
-                      referralCode
-                    ),
-
-                  p_amount:
-                    REFERRAL_REWARD,
-                }),
-            }
-          );
-
-          console.log(
-            `💰 Referral reward ${REFERRAL_REWARD} given to ${referralCode}`
-          );
-        } catch (err) {
-          console.error(
-            "Referral reward error:",
-            err.message
-          );
-        }
-      }
-    } catch (err) {
-      console.error(
-        "Referral creation error:",
-        err.message
-      );
-    }
-  }
-
-  return user;
-}
-
-// ============================================================
-// CHANNEL MEMBERSHIP
-// ============================================================
-
-async function isChannelMember(
-  chatId,
-  channel
+async function checkChannel(
+  channelUsername,
+  telegramUserId
 ) {
   try {
+    console.log(
+      `🔎 Checking ${channelUsername} for user ${telegramUserId}`
+    );
+
     const member =
       await bot.getChatMember(
-        channel,
-        Number(chatId)
+        channelUsername,
+        telegramUserId
       );
 
-    return [
-      "creator",
-      "administrator",
-      "member",
-      "restricted",
-    ].includes(
-      member.status
-    );
-  } catch (err) {
+    const status =
+      member?.status;
+
+    const joined =
+      status === "creator" ||
+      status === "administrator" ||
+      status === "member" ||
+      (
+        status === "restricted" &&
+        member?.is_member === true
+      );
+
+    return {
+      joined,
+
+      status:
+        status || "unknown",
+
+      error: null
+    };
+
+  } catch (error) {
     console.error(
-      `Membership check failed ${channel}:`,
-      err.message
+      `❌ Channel check failed ${channelUsername}:`,
+      error?.message || error
     );
 
-    return false;
+    return {
+      joined: false,
+
+      status:
+        "api_error",
+
+      error:
+        error?.message ||
+        "Telegram API error"
+    };
   }
 }
+
+// ==================================================
+// VERIFY BOTH CHANNELS
+// ==================================================
 
 async function verifyChannels(
-  chatId
+  telegramUserId
 ) {
-  const mainJoined =
-    await isChannelMember(
-      chatId,
-      MAIN_CHANNEL
+  const main =
+    await checkChannel(
+      MAIN_CHANNEL,
+      telegramUserId
     );
 
-  const paymentJoined =
-    await isChannelMember(
-      chatId,
-      PAYMENT_CHANNEL
-    );
-
-  return {
-    mainJoined,
-    paymentJoined,
-  };
-}
-
-// ============================================================
-// TASK
-// ============================================================
-
-async function claimTask(
-  chatId,
-  taskId
-) {
-  const task =
-    TASKS[taskId];
-
-  if (!task) {
-    throw new Error(
-      "Invalid task"
-    );
-  }
-
-  const existing =
-    await supabaseFetch(
-      `/rest/v1/task_claims?chat_id=eq.${encodeURIComponent(
-        String(chatId)
-      )}&task_id=eq.${encodeURIComponent(
-        taskId
-      )}&select=*`
-    );
-
-  if (
-    existing?.length
-  ) {
-    const claimedAt =
-      new Date(
-        existing[0].claimed_at
-      ).getTime();
-
-    const remaining =
-      TASK_COOLDOWN_MS -
-      (
-        Date.now() -
-        claimedAt
-      );
-
-    if (
-      remaining > 0
-    ) {
-      throw new Error(
-        `Task available again in ${Math.ceil(
-          remaining / 3600000
-        )} hours`
-      );
-    }
-
-    await supabaseFetch(
-      `/rest/v1/task_claims?id=eq.${encodeURIComponent(
-        existing[0].id
-      )}`,
-      {
-        method:
-          "PATCH",
-
-        headers: {
-          Prefer:
-            "return=minimal",
-        },
-
-        body:
-          JSON.stringify({
-            claimed_at:
-              new Date().toISOString(),
-          }),
-      }
-    );
-  } else {
-    await supabaseFetch(
-      `/rest/v1/task_claims`,
-      {
-        method:
-          "POST",
-
-        headers: {
-          Prefer:
-            "return=minimal",
-        },
-
-        body:
-          JSON.stringify({
-            chat_id:
-              String(chatId),
-
-            task_id:
-              taskId,
-
-            claimed_at:
-              new Date().toISOString(),
-          }),
-      }
-    );
-  }
-
-  await supabaseFetch(
-    `/rest/v1/rpc/increment_user_balance`,
-    {
-      method:
-        "POST",
-
-      body:
-        JSON.stringify({
-          p_chat_id:
-            String(chatId),
-
-          p_amount:
-            task.reward,
-        }),
-    }
-  );
-
-  return task.reward;
-}
-
-// ============================================================
-// GALAXY -> USDT
-// ============================================================
-
-function galaxyToUSDT(
-  galaxy
-) {
-  return (
-    Number(galaxy) /
-    GALAXY_PER_USDT
-  );
-}
-
-// ============================================================
-// WALLET VALIDATION
-// ============================================================
-
-function isValidBSCWallet(
-  wallet
-) {
-  try {
-    return ethers.isAddress(
-      wallet
-    );
-  } catch {
-    return false;
-  }
-}
-
-// ============================================================
-// CREATE PAYOUT
-// ============================================================
-
-async function createPayout(
-  chatId,
-  amount,
-  wallet
-) {
-  return await supabaseFetch(
-    `/rest/v1/rpc/create_manual_payout`,
-    {
-      method:
-        "POST",
-
-      body:
-        JSON.stringify({
-          p_chat_id:
-            String(chatId),
-
-          p_amount:
-            Number(amount),
-
-          p_wallet:
-            wallet,
-        }),
-    }
-  );
-}
-
-// ============================================================
-// UPDATE PAYOUT DIRECTLY
-// ============================================================
-
-async function updatePayoutStatus(
-  payoutId,
-  status,
-  txHash = null
-) {
-  const payload = {
-    status,
-
-    processed_at:
-      new Date().toISOString(),
-  };
-
-  if (txHash) {
-    payload.tx_hash =
-      txHash;
-  }
-
-  return await supabaseFetch(
-    `/rest/v1/payouts?id=eq.${encodeURIComponent(
-      String(payoutId)
-    )}`,
-    {
-      method:
-        "PATCH",
-
-      headers: {
-        Prefer:
-          "return=representation",
-      },
-
-      body:
-        JSON.stringify(
-          payload
-        ),
-    }
-  );
-}
-
-// ============================================================
-// PAYMENT CHANNEL
-// ============================================================
-
-async function sendPayoutToPaymentChannel({
-  payoutId,
-  chatId,
-  amountGalaxy,
-  wallet,
-  status,
-  txHash = null,
-  usdtAmount = null,
-  error = null,
-}) {
-  try {
-    const user =
-      await getUser(
-        chatId
-      );
-
-    const username =
-      user?.username
-        ? `@${user.username}`
-        : "No username";
-
-    const firstName =
-      user?.first_name ||
-      "User";
-
-    let message =
-      "";
-
-    if (
-      status ===
-      "processing"
-    ) {
-      message =
-        `💸 <b>USDT Withdrawal Processing</b>\n\n` +
-        `👤 <b>User:</b> ${firstName}\n` +
-        `🔗 <b>Username:</b> ${username}\n` +
-        `🆔 <b>Chat ID:</b> <code>${chatId}</code>\n\n` +
-        `💰 <b>GALAXY:</b> ${Number(
-          amountGalaxy
-        ).toLocaleString()}\n` +
-        `💵 <b>USDT:</b> ${Number(
-          usdtAmount ||
-            galaxyToUSDT(
-              amountGalaxy
-            )
-        ).toFixed(6)} USDT\n` +
-        `🏦 <b>Wallet:</b>\n<code>${wallet}</code>\n\n` +
-        `🆔 <b>Payout ID:</b> ${payoutId}\n` +
-        `⏳ <b>Status:</b> Processing`;
-    }
-
-    if (
-      status === "paid"
-    ) {
-      message =
-        `✅ <b>USDT Withdrawal Paid</b>\n\n` +
-        `👤 <b>User:</b> ${firstName}\n` +
-        `🔗 <b>Username:</b> ${username}\n` +
-        `🆔 <b>Chat ID:</b> <code>${chatId}</code>\n\n` +
-        `💰 <b>GALAXY:</b> ${Number(
-          amountGalaxy
-        ).toLocaleString()}\n` +
-        `💵 <b>USDT:</b> ${Number(
-          usdtAmount ||
-            galaxyToUSDT(
-              amountGalaxy
-            )
-        ).toFixed(6)} USDT\n` +
-        `🏦 <b>Wallet:</b>\n<code>${wallet}</code>\n\n` +
-        `🆔 <b>Payout ID:</b> ${payoutId}\n` +
-        `🔗 <b>TX:</b>\n<code>${txHash || "N/A"}</code>\n\n` +
-        `🟢 <b>Status:</b> Paid`;
-    }
-
-    if (
-      status === "failed"
-    ) {
-      message =
-        `❌ <b>USDT Withdrawal Failed</b>\n\n` +
-        `👤 <b>User:</b> ${firstName}\n` +
-        `🆔 <b>Chat ID:</b> <code>${chatId}</code>\n\n` +
-        `💰 <b>GALAXY:</b> ${Number(
-          amountGalaxy
-        ).toLocaleString()}\n` +
-        `💵 <b>USDT:</b> ${Number(
-          usdtAmount ||
-            galaxyToUSDT(
-              amountGalaxy
-            )
-        ).toFixed(6)} USDT\n` +
-        `🏦 <b>Wallet:</b>\n<code>${wallet}</code>\n\n` +
-        `🆔 <b>Payout ID:</b> ${payoutId}\n` +
-        `🔴 <b>Status:</b> Failed\n` +
-        `⚠️ ${error || "Unknown error"}`;
-    }
-
-    if (!message) {
-      return;
-    }
-
-    await bot.sendMessage(
+  const payments =
+    await checkChannel(
       PAYMENT_CHANNEL,
-      message,
-      {
-        parse_mode:
-          "HTML",
-
-        disable_web_page_preview:
-          true,
-      }
-    );
-  } catch (err) {
-    console.error(
-      "Payment channel notification error:",
-      err.message
-    );
-  }
-}
-
-// ============================================================
-// AUTO BSC PAYOUT
-// ============================================================
-
-async function processAutoPayout({
-  amountGalaxy,
-  wallet,
-}) {
-  const usdtAmount =
-    galaxyToUSDT(
-      amountGalaxy
+      telegramUserId
     );
 
-  if (!AUTO_PAYOUT) {
-    throw new Error(
-      "Automatic payout is disabled."
-    );
-  }
-
-  if (
-    !payoutSigner ||
-    !usdtContract
-  ) {
-    throw new Error(
-      "Payout wallet is not configured."
-    );
-  }
-
-  if (
-    !isValidBSCWallet(
-      wallet
-    )
-  ) {
-    throw new Error(
-      "Invalid BSC wallet address."
-    );
-  }
-
-  const signerAddress =
-    await payoutSigner.getAddress();
-
-  if (
-    signerAddress.toLowerCase() !==
-    PAYOUT_WALLET.toLowerCase()
-  ) {
-    throw new Error(
-      "PAYOUT_WALLET does not match PAYOUT_PRIVATE_KEY wallet."
-    );
-  }
-
-  const decimals =
-    await usdtContract.decimals();
-
-  const tokenAmount =
-    ethers.parseUnits(
-      usdtAmount.toFixed(
-        Number(decimals)
-      ),
-      Number(decimals)
-    );
-
-  const balance =
-    await usdtContract.balanceOf(
-      signerAddress
-    );
-
-  if (
-    balance <
-    tokenAmount
-  ) {
-    throw new Error(
-      `Insufficient USDT balance. Required ${usdtAmount} USDT.`
-    );
-  }
-
-  const tx =
-    await usdtContract.transfer(
-      wallet,
-      tokenAmount
-    );
-
-  console.log(
-    "USDT transaction submitted:",
-    tx.hash
-  );
-
-  const receipt =
-    await tx.wait();
-
-  if (!receipt) {
-    throw new Error(
-      "Transaction confirmation failed."
-    );
-  }
-
-  console.log(
-    "USDT transaction confirmed:",
-    tx.hash
-  );
+  const joined =
+    main.joined &&
+    payments.joined;
 
   return {
-    success:
-      true,
-
-    txHash:
-      tx.hash,
-
-    usdtAmount,
+    joined,
+    main,
+    payments
   };
 }
 
-// ============================================================
-// PAYOUT HISTORY
-// ============================================================
+// ==================================================
+// /START
+// ==================================================
 
-async function getPayoutHistory(
-  chatId
+async function handleStart(
+  msg
 ) {
-  return await supabaseFetch(
-    `/rest/v1/payouts?chat_id=eq.${encodeURIComponent(
-      String(chatId)
-    )}&select=id,amount,wallet_address,status,tx_hash,created_at,processed_at&order=created_at.desc`
+  const chatId =
+    msg.chat.id.toString();
+
+  console.log(
+    `📲 /start from ${chatId}`
+  );
+
+  const text =
+    msg.text || "";
+
+  const parts =
+    text
+      .trim()
+      .split(/\s+/);
+
+  let referrerId =
+    null;
+
+  if (
+    parts.length >= 2 &&
+    /^\d+$/.test(parts[1])
+  ) {
+    referrerId =
+      parts[1];
+
+    if (
+      referrerId === chatId
+    ) {
+      referrerId =
+        null;
+    }
+  }
+
+  const existingUser =
+    await getUser(chatId);
+
+  if (!existingUser) {
+
+    await registerUser(
+      chatId,
+      referrerId
+    );
+
+    console.log(
+      `🎁 New user ${chatId} registered with 500 GALAXY`
+    );
+
+    if (referrerId) {
+      console.log(
+        `👥 Referral candidate: ${referrerId}`
+      );
+    }
+
+  } else {
+
+    console.log(
+      `👤 Existing user ${chatId}`
+    );
+  }
+
+  await bot.sendMessage(
+    chatId,
+
+    "🌌 *Galaxy Token*\n\n🚀 Open the Mini App to access your Galaxy account.",
+
+    {
+      parse_mode:
+        "Markdown",
+
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text:
+                "🚀 Open Galaxy Token",
+
+              web_app: {
+                url:
+                  WEB_APP_URL
+              }
+            }
+          ]
+        ]
+      }
+    }
   );
 }
 
-// ============================================================
+// ==================================================
+// READ HTTP BODY
+// ==================================================
+
+function readBody(
+  req
+) {
+  return new Promise(
+    (resolve, reject) => {
+
+      let body = "";
+
+      req.on(
+        "data",
+        chunk => {
+          body +=
+            chunk.toString();
+        }
+      );
+
+      req.on(
+        "end",
+        () => {
+          resolve(body);
+        }
+      );
+
+      req.on(
+        "error",
+        reject
+      );
+    }
+  );
+}
+
+// ==================================================
+// JSON RESPONSE
+// ==================================================
+
+function sendJson(
+  res,
+  statusCode,
+  data
+) {
+  res.writeHead(
+    statusCode,
+    {
+      "Content-Type":
+        "application/json"
+    }
+  );
+
+  res.end(
+    JSON.stringify(data)
+  );
+}
+
+// ==================================================
+// AUTH HELPER
+// ==================================================
+
+async function authenticate(
+  parsed
+) {
+  const telegramUser =
+    verifyTelegramInitData(
+      parsed?.initData
+    );
+
+  if (!telegramUser) {
+    return null;
+  }
+
+  return telegramUser;
+}
+
+// ==================================================
 // HTTP SERVER
-// ============================================================
+// ==================================================
 
 const server =
   http.createServer(
@@ -1090,383 +676,873 @@ const server =
       req,
       res
     ) => {
+
+      // ------------------------------------------------
+      // CORS
+      // ------------------------------------------------
+
+      res.setHeader(
+        "Access-Control-Allow-Origin",
+        "*"
+      );
+
+      res.setHeader(
+        "Access-Control-Allow-Methods",
+        "GET, POST, OPTIONS"
+      );
+
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type"
+      );
+
+      // ------------------------------------------------
+      // OPTIONS
+      // ------------------------------------------------
+
+      if (
+        req.method ===
+        "OPTIONS"
+      ) {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
       try {
 
-        res.setHeader(
-          "Access-Control-Allow-Origin",
-          "*"
-        );
-
-        res.setHeader(
-          "Access-Control-Allow-Headers",
-          "Content-Type, Authorization"
-        );
-
-        res.setHeader(
-          "Access-Control-Allow-Methods",
-          "GET, POST, OPTIONS"
-        );
+        // ==============================================
+        // HEALTH
+        // ==============================================
 
         if (
-          req.method ===
-          "OPTIONS"
+          req.method === "GET" &&
+          (
+            req.url === "/" ||
+            req.url === "/health"
+          )
         ) {
-          res.writeHead(204);
-          res.end();
+
+          sendJson(
+            res,
+            200,
+            {
+              status:
+                "ok",
+
+              app:
+                "Galaxy Token"
+            }
+          );
+
           return;
         }
 
-        // ====================================================
-        // READ BODY
-        // ====================================================
-
-        let body = "";
-
-        if (
-          req.method ===
-          "POST"
-        ) {
-          await new Promise(
-            (resolve) => {
-
-              req.on(
-                "data",
-                (
-                  chunk
-                ) => {
-                  body +=
-                    chunk;
-                }
-              );
-
-              req.on(
-                "end",
-                resolve
-              );
-            }
-          );
-        }
-
-        let data = {};
-
-        try {
-          data =
-            body
-              ? JSON.parse(
-                  body
-                )
-              : {};
-        } catch {
-          data = {};
-        }
-
-        // ====================================================
+        // ==============================================
         // TELEGRAM WEBHOOK
-        // ====================================================
+        // ==============================================
 
         if (
+          req.method === "POST" &&
           req.url ===
-            "/telegram-webhook" &&
-          req.method ===
-            "POST"
+            `/bot${BOT_TOKEN}`
         ) {
+
+          const body =
+            await readBody(req);
+
           try {
 
-            bot.processUpdate(
-              data
-            );
+            const update =
+              JSON.parse(body);
 
-            res.writeHead(
-              200,
+            if (
+              update.message &&
+              update.message.text &&
+              update.message.text.startsWith(
+                "/start"
+              )
+            ) {
+
+              await handleStart(
+                update.message
+              );
+            }
+
+          } catch (error) {
+
+            console.error(
+              "Webhook processing error:",
+              error
+            );
+          }
+
+          sendJson(
+            res,
+            200,
+            {
+              ok: true
+            }
+          );
+
+          return;
+        }
+
+        // ==============================================
+        // VERIFY CHANNELS
+        // ==============================================
+
+        if (
+          req.method === "POST" &&
+          req.url ===
+            "/verify-channels"
+        ) {
+
+          const body =
+            await readBody(req);
+
+          let parsed;
+
+          try {
+
+            parsed =
+              JSON.parse(body);
+
+          } catch {
+
+            sendJson(
+              res,
+              400,
               {
-                "Content-Type":
-                  "text/plain",
+                success:
+                  false,
+
+                error:
+                  "INVALID_JSON"
               }
             );
 
-            res.end(
-              "OK"
-            );
-
-          } catch (err) {
-
-            console.error(
-              "Telegram webhook processing error:",
-              err.message
-            );
-
-            res.writeHead(
-              200
-            );
-
-            res.end(
-              "OK"
-            );
-          }
-
-          return;
-        }
-
-        // ====================================================
-        // HEALTH
-        // ====================================================
-
-        if (
-          req.url === "/" &&
-          req.method === "GET"
-        ) {
-
-          res.writeHead(
-            200,
-            {
-              "Content-Type":
-                "application/json",
-            }
-          );
-
-          res.end(
-            JSON.stringify({
-              ok:
-                true,
-
-              service:
-                "Galaxy Token Backend",
-
-              version:
-                "galaxy-auto-bsc-webhook-v2",
-
-              autoPayout:
-                AUTO_PAYOUT,
-            })
-          );
-
-          return;
-        }
-
-        // ====================================================
-        // TELEGRAM WEB APP AUTH
-        // ====================================================
-
-        const telegramUser =
-          validateTelegramInitData(
-            data.initData
-          );
-
-        // ====================================================
-        // SYNC
-        // ====================================================
-
-        if (
-          req.url === "/sync" &&
-          req.method === "POST"
-        ) {
-
-          if (!telegramUser) {
-
-            res.writeHead(
-              401
-            );
-
-            res.end(
-              JSON.stringify({
-                error:
-                  "Invalid Telegram authentication",
-              })
-            );
-
             return;
           }
 
-          const user =
-            await createUser(
-              telegramUser,
-              data.referralCode ||
-                null
+          const telegramUser =
+            await authenticate(
+              parsed
             );
-
-          res.writeHead(
-            200,
-            {
-              "Content-Type":
-                "application/json",
-            }
-          );
-
-          res.end(
-            JSON.stringify({
-              ok:
-                true,
-
-              user,
-            })
-          );
-
-          return;
-        }
-
-        // ====================================================
-        // EARN
-        // ====================================================
-
-        if (
-          req.url === "/earn" &&
-          req.method === "POST"
-        ) {
 
           if (!telegramUser) {
 
-            res.writeHead(
-              401
-            );
+            sendJson(
+              res,
+              401,
+              {
+                success:
+                  false,
 
-            res.end(
-              JSON.stringify({
                 error:
-                  "Invalid Telegram authentication",
-              })
+                  "INVALID_TELEGRAM_SESSION"
+              }
             );
 
             return;
           }
 
           const chatId =
-            String(
-              telegramUser.id
-            );
-
-          await createUser(
-            telegramUser
-          );
-
-          const reward =
-            await claimTask(
-              chatId,
-              data.taskId
-            );
-
-          const user =
-            await getUser(
-              chatId
-            );
-
-          res.writeHead(
-            200,
-            {
-              "Content-Type":
-                "application/json",
-            }
-          );
-
-          res.end(
-            JSON.stringify({
-              ok:
-                true,
-
-              reward,
-
-              balance:
-                user?.balance ||
-                0,
-            })
-          );
-
-          return;
-        }
-
-        // ====================================================
-        // VERIFY CHANNELS
-        // ====================================================
-
-        if (
-          req.url ===
-            "/verify-channels" &&
-          req.method ===
-            "POST"
-        ) {
-
-          if (!telegramUser) {
-
-            res.writeHead(
-              401
-            );
-
-            res.end(
-              JSON.stringify({
-                error:
-                  "Invalid Telegram authentication",
-              })
-            );
-
-            return;
-          }
+            telegramUser.id.toString();
 
           const result =
             await verifyChannels(
-              String(
-                telegramUser.id
-              )
+              chatId
             );
 
-          res.writeHead(
+          sendJson(
+            res,
             200,
             {
-              "Content-Type":
-                "application/json",
-            }
-          );
-
-          res.end(
-            JSON.stringify({
-              ok:
+              success:
                 true,
 
-              ...result,
-            })
+              joined:
+                result.joined,
+
+              main: {
+                joined:
+                  result.main.joined,
+
+                status:
+                  result.main.status,
+
+                error:
+                  result.main.error
+              },
+
+              payments: {
+                joined:
+                  result.payments.joined,
+
+                status:
+                  result.payments.status,
+
+                error:
+                  result.payments.error
+              }
+            }
           );
 
           return;
         }
 
-        // ====================================================
-        // PAYOUT
-        // ====================================================
+        // ==============================================
+        // SYNC
+        // ==============================================
 
         if (
-          req.url === "/payout" &&
-          req.method ===
-            "POST"
+          req.method === "POST" &&
+          req.url === "/sync"
         ) {
+
+          const body =
+            await readBody(req);
+
+          let parsed;
+
+          try {
+
+            parsed =
+              JSON.parse(body);
+
+          } catch {
+
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
+
+                error:
+                  "INVALID_JSON"
+              }
+            );
+
+            return;
+          }
+
+          const telegramUser =
+            await authenticate(
+              parsed
+            );
 
           if (!telegramUser) {
 
-            res.writeHead(
-              401
-            );
+            sendJson(
+              res,
+              401,
+              {
+                success:
+                  false,
 
-            res.end(
-              JSON.stringify({
                 error:
-                  "Invalid Telegram authentication",
-              })
+                  "INVALID_TELEGRAM_SESSION"
+              }
             );
 
             return;
           }
 
           const chatId =
-            String(
-              telegramUser.id
+            telegramUser.id.toString();
+
+          const user =
+            await ensureUser(
+              chatId
             );
+
+          if (!user) {
+            throw new Error(
+              "USER_NOT_FOUND"
+            );
+          }
+
+          // Get task cooldown information
+
+          const claims =
+            await supabaseRequest(
+              `/rest/v1/task_claims?chat_id=eq.${encodeURIComponent(
+                chatId
+              )}&select=task_id,claimed_at`
+            );
+
+          const now =
+            Date.now();
+
+          const tasks =
+            YOUTUBE_TASKS.map(
+              task => {
+
+                const claim =
+                  Array.isArray(claims)
+                    ? claims.find(
+                        x =>
+                          x.task_id ===
+                          task.id
+                      )
+                    : null;
+
+                let available =
+                  true;
+
+                let nextAvailableAt =
+                  null;
+
+                let remainingSeconds =
+                  0;
+
+                if (
+                  claim?.claimed_at
+                ) {
+
+                  const claimedTime =
+                    new Date(
+                      claim.claimed_at
+                    ).getTime();
+
+                  const nextTime =
+                    claimedTime +
+                    TASK_COOLDOWN_MS;
+
+                  if (
+                    now <
+                    nextTime
+                  ) {
+
+                    available =
+                      false;
+
+                    nextAvailableAt =
+                      new Date(
+                        nextTime
+                      ).toISOString();
+
+                    remainingSeconds =
+                      Math.ceil(
+                        (
+                          nextTime -
+                          now
+                        ) / 1000
+                      );
+                  }
+                }
+
+                return {
+                  id:
+                    task.id,
+
+                  url:
+                    task.url,
+
+                  reward:
+                    task.reward,
+
+                  usdt:
+                    task.reward /
+                    GALAXY_PER_USDT,
+
+                  available,
+
+                  nextAvailableAt,
+
+                  remainingSeconds
+                };
+              }
+            );
+
+          sendJson(
+            res,
+            200,
+            {
+              success:
+                true,
+
+              balance:
+                Number(
+                  user.balance || 0
+                ),
+
+              referrals:
+                Number(
+                  user.referral_count ||
+                    0
+                ),
+
+              referralReward:
+                REFERRAL_REWARD,
+
+              referralRewardUsdt:
+                REFERRAL_REWARD /
+                GALAXY_PER_USDT,
+
+              joiningBonus:
+                STARTING_BALANCE,
+
+              joiningBonusUsdt:
+                STARTING_BALANCE /
+                GALAXY_PER_USDT,
+
+              minWithdrawal:
+                MIN_WITHDRAWAL,
+
+              minWithdrawalUsdt:
+                MIN_WITHDRAWAL /
+                GALAXY_PER_USDT,
+
+              tasks
+            }
+          );
+
+          return;
+        }
+
+        // ==============================================
+        // EARN YOUTUBE TASK
+        // 24 HOUR SERVER-SIDE COOLDOWN
+        // ==============================================
+
+        if (
+          req.method === "POST" &&
+          req.url === "/earn"
+        ) {
+
+          const body =
+            await readBody(req);
+
+          let parsed;
+
+          try {
+
+            parsed =
+              JSON.parse(body);
+
+          } catch {
+
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
+
+                error:
+                  "INVALID_JSON"
+              }
+            );
+
+            return;
+          }
+
+          const telegramUser =
+            await authenticate(
+              parsed
+            );
+
+          if (!telegramUser) {
+
+            sendJson(
+              res,
+              401,
+              {
+                success:
+                  false,
+
+                error:
+                  "INVALID_TELEGRAM_SESSION"
+              }
+            );
+
+            return;
+          }
+
+          const task =
+            YOUTUBE_TASKS.find(
+              x =>
+                x.id ===
+                parsed?.taskId
+            );
+
+          if (!task) {
+
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
+
+                error:
+                  "INVALID_TASK"
+              }
+            );
+
+            return;
+          }
+
+          const chatId =
+            telegramUser.id.toString();
+
+          // ==================================================
+          // CHECK CHANNEL MEMBERSHIP
+          // ==================================================
+
+          const channels =
+            await verifyChannels(
+              chatId
+            );
+
+          if (
+            !channels.joined
+          ) {
+
+            sendJson(
+              res,
+              403,
+              {
+                success:
+                  false,
+
+                error:
+                  "CHANNEL_JOIN_REQUIRED",
+
+                main:
+                  channels.main,
+
+                payments:
+                  channels.payments
+              }
+            );
+
+            return;
+          }
+
+          await ensureUser(
+            chatId
+          );
+
+          // ==================================================
+          // IMPORTANT:
+          // CHECK EXISTING CLAIM BEFORE RPC
+          //
+          // This prevents the Supabase RPC from throwing
+          // "Task available again in X hours" as a 500 error.
+          // ==================================================
+
+          const existingClaims =
+            await supabaseRequest(
+              `/rest/v1/task_claims?chat_id=eq.${encodeURIComponent(
+                chatId
+              )}&task_id=eq.${encodeURIComponent(
+                task.id
+              )}&select=task_id,claimed_at&limit=1`
+            );
+
+          const existingClaim =
+            Array.isArray(existingClaims) &&
+            existingClaims.length
+              ? existingClaims[0]
+              : null;
+
+          if (
+            existingClaim?.claimed_at
+          ) {
+
+            const claimedTime =
+              new Date(
+                existingClaim.claimed_at
+              ).getTime();
+
+            const nextAvailableTime =
+              claimedTime +
+              TASK_COOLDOWN_MS;
+
+            const now =
+              Date.now();
+
+            if (
+              now <
+              nextAvailableTime
+            ) {
+
+              const remainingSeconds =
+                Math.ceil(
+                  (
+                    nextAvailableTime -
+                    now
+                  ) / 1000
+                );
+
+              const remainingHours =
+                Math.floor(
+                  remainingSeconds /
+                  3600
+                );
+
+              const remainingMinutes =
+                Math.floor(
+                  (
+                    remainingSeconds %
+                    3600
+                  ) / 60
+                );
+
+              console.log(
+                `⏳ ${chatId} tried ${task.id} again. Available in ${remainingHours}h ${remainingMinutes}m`
+              );
+
+              sendJson(
+                res,
+                429,
+                {
+                  success:
+                    false,
+
+                  error:
+                    "TASK_COOLDOWN",
+
+                  message:
+                    `Task available again in ${remainingHours} hours ${remainingMinutes} minutes.`,
+
+                  nextAvailableAt:
+                    new Date(
+                      nextAvailableTime
+                    ).toISOString(),
+
+                  remainingSeconds
+                }
+              );
+
+              return;
+            }
+          }
+
+          // ==================================================
+          // ATOMIC 24-HOUR TASK CLAIM
+          // ==================================================
+
+          let result;
+
+          try {
+
+            result =
+              await supabaseRequest(
+                "/rest/v1/rpc/claim_youtube_task",
+                {
+                  method:
+                    "POST",
+
+                  body:
+                    JSON.stringify({
+                      p_chat_id:
+                        chatId,
+
+                      p_task_id:
+                        task.id,
+
+                      p_reward:
+                        task.reward
+                    })
+                }
+              );
+
+          } catch (rpcError) {
+
+            // ==================================================
+            // SAFETY FALLBACK
+            //
+            // If SQL RPC itself throws a cooldown error,
+            // return a proper cooldown response instead of 500.
+            // ==================================================
+
+            const errorMessage =
+              String(
+                rpcError?.message ||
+                ""
+              );
+
+            if (
+              /available again|cooldown|already claimed/i.test(
+                errorMessage
+              )
+            ) {
+
+              console.log(
+                `⏳ ${chatId} task cooldown handled from RPC error`
+              );
+
+              sendJson(
+                res,
+                429,
+                {
+                  success:
+                    false,
+
+                  error:
+                    "TASK_COOLDOWN",
+
+                  message:
+                    "This task will be available again after 24 hours.",
+
+                  nextAvailableAt:
+                    null,
+
+                  remainingSeconds:
+                    0
+                }
+              );
+
+              return;
+            }
+
+            throw rpcError;
+          }
+
+          const claimResult =
+            Array.isArray(result)
+              ? result[0]
+              : result;
+
+          if (
+            !claimResult ||
+            claimResult.success !== true
+          ) {
+
+            sendJson(
+              res,
+              429,
+              {
+                success:
+                  false,
+
+                error:
+                  "TASK_COOLDOWN",
+
+                message:
+                  "This task will be available again after 24 hours.",
+
+                nextAvailableAt:
+                  claimResult?.next_available_at ||
+                  null,
+
+                remainingSeconds:
+                  Number(
+                    claimResult?.remaining_seconds ||
+                      0
+                  )
+              }
+            );
+
+            return;
+          }
+
+          // ==================================================
+          // SUCCESS
+          // ==================================================
+
+          sendJson(
+            res,
+            200,
+            {
+              success:
+                true,
+
+              balance:
+                Number(
+                  claimResult.balance
+                ),
+
+              earned:
+                task.reward,
+
+              usdt:
+                task.reward /
+                GALAXY_PER_USDT,
+
+              nextAvailableAt:
+                claimResult.next_available_at
+            }
+          );
+
+          console.log(
+            `💰 ${chatId} earned ${task.reward} GALAXY from ${task.id}`
+          );
+
+          return;
+        }
+
+        // ==============================================
+        // CREATE WITHDRAWAL
+        // ==============================================
+
+        if (
+          req.method === "POST" &&
+          req.url === "/payout"
+        ) {
+
+          const body =
+            await readBody(req);
+
+          let parsed;
+
+          try {
+
+            parsed =
+              JSON.parse(body);
+
+          } catch {
+
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
+
+                error:
+                  "INVALID_JSON"
+              }
+            );
+
+            return;
+          }
+
+          const telegramUser =
+            await authenticate(
+              parsed
+            );
+
+          if (!telegramUser) {
+
+            sendJson(
+              res,
+              401,
+              {
+                success:
+                  false,
+
+                error:
+                  "INVALID_TELEGRAM_SESSION"
+              }
+            );
+
+            return;
+          }
 
           const amount =
             Number(
-              data.amount
+              parsed.amount
             );
 
           const wallet =
             String(
-              data.wallet ||
-                ""
+              parsed.wallet || ""
             ).trim();
 
           if (
@@ -1475,15 +1551,16 @@ const server =
             )
           ) {
 
-            res.writeHead(
-              400
-            );
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
 
-            res.end(
-              JSON.stringify({
                 error:
-                  "Invalid withdrawal amount.",
-              })
+                  "INVALID_AMOUNT"
+              }
             );
 
             return;
@@ -1494,642 +1571,483 @@ const server =
             MIN_WITHDRAWAL
           ) {
 
-            res.writeHead(
-              400
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
+
+                error:
+                  "MIN_WITHDRAWAL",
+
+                minimum:
+                  MIN_WITHDRAWAL,
+
+                minimumUsdt:
+                  MIN_WITHDRAWAL /
+                  GALAXY_PER_USDT
+              }
             );
 
-            res.end(
-              JSON.stringify({
+            return;
+          }
+
+          if (!wallet) {
+
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
+
                 error:
-                  `Minimum withdrawal is ${MIN_WITHDRAWAL} GALAXY.`,
-              })
+                  "WALLET_REQUIRED"
+              }
             );
 
             return;
           }
 
           if (
-            !isValidBSCWallet(
-              wallet
-            )
+            wallet.length < 10 ||
+            wallet.length > 150
           ) {
 
-            res.writeHead(
-              400
-            );
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
 
-            res.end(
-              JSON.stringify({
                 error:
-                  "Invalid BSC wallet address.",
-              })
+                  "INVALID_WALLET"
+              }
             );
 
             return;
           }
 
-          await createUser(
-            telegramUser
+          const chatId =
+            telegramUser.id.toString();
+
+          const result =
+            await supabaseRequest(
+              "/rest/v1/rpc/create_manual_payout",
+              {
+                method:
+                  "POST",
+
+                body:
+                  JSON.stringify({
+                    p_chat_id:
+                      chatId,
+
+                    p_amount:
+                      amount,
+
+                    p_wallet:
+                      wallet
+                  })
+              }
+            );
+
+          const payout =
+            Array.isArray(result)
+              ? result[0]
+              : result;
+
+          if (
+            !payout ||
+            payout.success !== true
+          ) {
+
+            const errorCode =
+              payout?.error ||
+              "PAYOUT_FAILED";
+
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
+
+                error:
+                  errorCode
+              }
+            );
+
+            return;
+          }
+
+          sendJson(
+            res,
+            200,
+            {
+              success:
+                true,
+
+              payoutId:
+                payout.payout_id,
+
+              balance:
+                Number(
+                  payout.balance
+                ),
+
+              amount,
+
+              usdt:
+                amount /
+                GALAXY_PER_USDT,
+
+              status:
+                "pending"
+            }
           );
 
-          const user =
-            await getUser(
-              chatId
-            );
+          console.log(
+            `💸 Withdrawal created: ${chatId} | ${amount} GALAXY | ${wallet}`
+          );
 
-          if (!user) {
+          return;
+        }
 
-            res.writeHead(
-              400
-            );
+        // ==============================================
+        // USER PAYOUT HISTORY
+        // ==============================================
 
-            res.end(
-              JSON.stringify({
-                error:
-                  "User not found.",
-              })
-            );
+        if (
+          req.method === "POST" &&
+          req.url === "/payouts"
+        ) {
 
-            return;
-          }
+          const body =
+            await readBody(req);
 
-          if (
-            Number(
-              user.balance ||
-                0
-            ) < amount
-          ) {
-
-            res.writeHead(
-              400
-            );
-
-            res.end(
-              JSON.stringify({
-                error:
-                  "Insufficient GALAXY balance.",
-              })
-            );
-
-            return;
-          }
-
-          const usdtAmount =
-            galaxyToUSDT(
-              amount
-            );
-
-          // --------------------------------------------------
-          // CREATE PAYOUT
-          // --------------------------------------------------
-
-          let payout;
+          let parsed;
 
           try {
 
-            payout =
-              await createPayout(
-                chatId,
-                amount,
-                wallet
-              );
+            parsed =
+              JSON.parse(body);
 
-          } catch (err) {
+          } catch {
 
-            console.error(
-              "Payout creation error:",
-              err.message
-            );
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
 
-            res.writeHead(
-              500
-            );
-
-            res.end(
-              JSON.stringify({
                 error:
-                  "Unable to create payout.",
+                  "INVALID_JSON"
+              }
+            );
 
-                details:
-                  err.message,
-              })
+            return;
+          }
+
+          const telegramUser =
+            await authenticate(
+              parsed
+            );
+
+          if (!telegramUser) {
+
+            sendJson(
+              res,
+              401,
+              {
+                success:
+                  false,
+
+                error:
+                  "INVALID_TELEGRAM_SESSION"
+              }
+            );
+
+            return;
+          }
+
+          const chatId =
+            telegramUser.id.toString();
+
+          const payouts =
+            await supabaseRequest(
+              `/rest/v1/payouts?chat_id=eq.${encodeURIComponent(
+                chatId
+              )}&select=id,amount,wallet,status,created_at,processed_at&order=created_at.desc&limit=50`
+            );
+
+          sendJson(
+            res,
+            200,
+            {
+              success:
+                true,
+
+              payouts:
+                (
+                  payouts || []
+                ).map(
+                  p => ({
+                    id:
+                      p.id,
+
+                    amount:
+                      Number(
+                        p.amount
+                      ),
+
+                    usdt:
+                      Number(
+                        p.amount
+                      ) /
+                      GALAXY_PER_USDT,
+
+                    wallet:
+                      p.wallet,
+
+                    status:
+                      p.status,
+
+                    createdAt:
+                      p.created_at,
+
+                    processedAt:
+                      p.processed_at
+                  })
+                )
+            }
+          );
+
+          return;
+        }
+
+        // ==============================================
+        // ADMIN PAYOUT STATUS
+        //
+        // paid     = mark paid
+        // rejected = reject + refund balance
+        // ==============================================
+
+        if (
+          req.method === "POST" &&
+          req.url === "/admin/payout"
+        ) {
+
+          if (!ADMIN_SECRET) {
+
+            sendJson(
+              res,
+              503,
+              {
+                success:
+                  false,
+
+                error:
+                  "ADMIN_SECRET_NOT_CONFIGURED"
+              }
+            );
+
+            return;
+          }
+
+          const body =
+            await readBody(req);
+
+          let parsed;
+
+          try {
+
+            parsed =
+              JSON.parse(body);
+
+          } catch {
+
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
+
+                error:
+                  "INVALID_JSON"
+              }
+            );
+
+            return;
+          }
+
+          if (
+            parsed.adminSecret !==
+            ADMIN_SECRET
+          ) {
+
+            sendJson(
+              res,
+              403,
+              {
+                success:
+                  false,
+
+                error:
+                  "INVALID_ADMIN_SECRET"
+              }
             );
 
             return;
           }
 
           const payoutId =
-            payout?.id ||
-            payout?.payout_id ||
-            payout?.[0]?.id ||
-            payout?.[0]?.payout_id;
+            String(
+              parsed.payoutId || ""
+            ).trim();
 
-          if (!payoutId) {
-
-            console.error(
-              "Payout ID missing:",
-              payout
-            );
-
-            res.writeHead(
-              500
-            );
-
-            res.end(
-              JSON.stringify({
-                error:
-                  "Payout ID was not returned.",
-              })
-            );
-
-            return;
-          }
-
-          // --------------------------------------------------
-          // AUTO PAYOUT
-          // --------------------------------------------------
+          const action =
+            String(
+              parsed.action || ""
+            ).toLowerCase();
 
           if (
-            AUTO_PAYOUT
+            !payoutId ||
+            ![
+              "paid",
+              "rejected"
+            ].includes(action)
           ) {
 
-            try {
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
 
-              await updatePayoutStatus(
-                payoutId,
-                "processing"
-              );
-
-            } catch (err) {
-
-              console.error(
-                "Processing status error:",
-                err.message
-              );
-            }
-
-            await sendPayoutToPaymentChannel({
-              payoutId,
-              chatId,
-              amountGalaxy:
-                amount,
-              wallet,
-              status:
-                "processing",
-              usdtAmount,
-            });
-
-            try {
-
-              const payment =
-                await processAutoPayout({
-                  amountGalaxy:
-                    amount,
-
-                  wallet,
-                });
-
-              await updatePayoutStatus(
-                payoutId,
-                "paid",
-                payment.txHash
-              );
-
-              await sendPayoutToPaymentChannel({
-                payoutId,
-                chatId,
-                amountGalaxy:
-                  amount,
-                wallet,
-                status:
-                  "paid",
-                txHash:
-                  payment.txHash,
-                usdtAmount:
-                  payment.usdtAmount,
-              });
-
-              res.writeHead(
-                200,
-                {
-                  "Content-Type":
-                    "application/json",
-                }
-              );
-
-              res.end(
-                JSON.stringify({
-                  ok:
-                    true,
-
-                  status:
-                    "paid",
-
-                  payoutId,
-
-                  amountGalaxy:
-                    amount,
-
-                  usdtAmount:
-                    payment.usdtAmount,
-
-                  txHash:
-                    payment.txHash,
-
-                  explorer:
-                    `https://bscscan.com/tx/${payment.txHash}`,
-                })
-              );
-
-              return;
-
-            } catch (err) {
-
-              console.error(
-                "AUTO PAYOUT ERROR:",
-                err.message
-              );
-
-              try {
-
-                await updatePayoutStatus(
-                  payoutId,
-                  "failed"
-                );
-
-              } catch (statusErr) {
-
-                console.error(
-                  "Failed status error:",
-                  statusErr.message
-                );
+                error:
+                  "INVALID_PAYOUT_ACTION"
               }
-
-              await sendPayoutToPaymentChannel({
-                payoutId,
-                chatId,
-                amountGalaxy:
-                  amount,
-                wallet,
-                status:
-                  "failed",
-                usdtAmount,
-                error:
-                  err.message,
-              });
-
-              res.writeHead(
-                500,
-                {
-                  "Content-Type":
-                    "application/json",
-                }
-              );
-
-              res.end(
-                JSON.stringify({
-                  ok:
-                    false,
-
-                  status:
-                    "failed",
-
-                  payoutId,
-
-                  error:
-                    "Automatic payout failed. Please contact support.",
-                })
-              );
-
-              return;
-            }
-          }
-
-          // --------------------------------------------------
-          // MANUAL FALLBACK
-          // --------------------------------------------------
-
-          await sendPayoutToPaymentChannel({
-            payoutId,
-            chatId,
-            amountGalaxy:
-              amount,
-            wallet,
-            status:
-              "processing",
-            usdtAmount,
-          });
-
-          res.writeHead(
-            200,
-            {
-              "Content-Type":
-                "application/json",
-            }
-          );
-
-          res.end(
-            JSON.stringify({
-              ok:
-                true,
-
-              status:
-                "pending",
-
-              payoutId,
-
-              amountGalaxy:
-                amount,
-
-              usdtAmount,
-            })
-          );
-
-          return;
-        }
-
-        // ====================================================
-        // PAYOUT HISTORY
-        // ====================================================
-
-        if (
-          req.url ===
-            "/payouts" &&
-          req.method ===
-            "POST"
-        ) {
-
-          if (!telegramUser) {
-
-            res.writeHead(
-              401
-            );
-
-            res.end(
-              JSON.stringify({
-                error:
-                  "Invalid Telegram authentication",
-              })
-            );
-
-            return;
-          }
-
-          const payouts =
-            await getPayoutHistory(
-              String(
-                telegramUser.id
-              )
-            );
-
-          res.writeHead(
-            200,
-            {
-              "Content-Type":
-                "application/json",
-            }
-          );
-
-          res.end(
-            JSON.stringify({
-              ok:
-                true,
-
-              payouts:
-                payouts ||
-                [],
-            })
-          );
-
-          return;
-        }
-
-        // ====================================================
-        // ADMIN PAYOUT
-        // ====================================================
-
-        if (
-          req.url ===
-            "/admin/payout" &&
-          req.method ===
-            "POST"
-        ) {
-
-          if (
-            !ADMIN_SECRET ||
-            data.secret !==
-              ADMIN_SECRET
-          ) {
-
-            res.writeHead(
-              403
-            );
-
-            res.end(
-              JSON.stringify({
-                error:
-                  "Unauthorized",
-              })
             );
 
             return;
           }
 
           const result =
-            await updatePayoutStatus(
-              Number(
-                data.payoutId
-              ),
+            await supabaseRequest(
+              "/rest/v1/rpc/update_payout_status",
+              {
+                method:
+                  "POST",
 
-              data.status,
+                body:
+                  JSON.stringify({
+                    p_payout_id:
+                      payoutId,
 
-              data.txHash ||
-                null
+                    p_status:
+                      action
+                  })
+              }
             );
 
-          res.writeHead(
+          const output =
+            Array.isArray(result)
+              ? result[0]
+              : result;
+
+          if (
+            !output ||
+            output.success !== true
+          ) {
+
+            sendJson(
+              res,
+              400,
+              {
+                success:
+                  false,
+
+                error:
+                  output?.error ||
+                  "PAYOUT_UPDATE_FAILED"
+              }
+            );
+
+            return;
+          }
+
+          sendJson(
+            res,
             200,
             {
-              "Content-Type":
-                "application/json",
+              success:
+                true,
+
+              payoutId,
+
+              status:
+                action,
+
+              refunded:
+                action ===
+                "rejected"
             }
           );
 
-          res.end(
-            JSON.stringify({
-              ok:
-                true,
-
-              result,
-            })
+          console.log(
+            `💳 Admin payout ${payoutId}: ${action}`
           );
 
           return;
         }
 
-        // ====================================================
-        // 404
-        // ====================================================
+        // ==============================================
+        // NOT FOUND
+        // ==============================================
 
-        res.writeHead(
+        sendJson(
+          res,
           404,
           {
-            "Content-Type":
-              "application/json",
+            success:
+              false,
+
+            error:
+              "NOT_FOUND"
           }
         );
 
-        res.end(
-          JSON.stringify({
-            error:
-              "Not found",
-          })
-        );
-
-      } catch (err) {
+      } catch (error) {
 
         console.error(
-          "SERVER ERROR:",
-          err
+          "❌ HTTP server error:",
+          error
         );
 
-        res.writeHead(
+        sendJson(
+          res,
           500,
           {
-            "Content-Type":
-              "application/json",
-          }
-        );
+            success:
+              false,
 
-        res.end(
-          JSON.stringify({
             error:
-              "Internal server error",
-
-            details:
-              err.message,
-          })
+              "SERVER_ERROR"
+          }
         );
       }
     }
   );
 
-// ============================================================
-// /START
-// ============================================================
-
-bot.onText(
-  /^\/start(?:\s+(.+))?$/i,
-
-  async (
-    msg,
-    match
-  ) => {
-    try {
-
-      const chatId =
-        String(
-          msg.chat.id
-        );
-
-      const referralCode =
-        match?.[1] ||
-        null;
-
-      await createUser(
-        msg.from,
-        referralCode
-      );
-
-      await bot.sendMessage(
-        chatId,
-
-        `🍃 <b>Welcome to Galaxy Token!</b>\n\n` +
-          `Earn GALAXY by completing tasks, playing games and inviting friends.\n\n` +
-          `💰 <b>10,000 GALAXY = 1 USDT</b>\n\n` +
-          `👇 Open the Mini App to start earning.`,
-
-        {
-          parse_mode:
-            "HTML",
-
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text:
-                    "🚀 Open Galaxy Token",
-
-                  web_app: {
-                    url:
-                      WEB_APP_URL,
-                  },
-                },
-              ],
-            ],
-          },
-        }
-      );
-
-    } catch (err) {
-
-      console.error(
-        "/start error:",
-        err.message
-      );
-    }
-  }
-);
-
-// ============================================================
-// /APP
-// ============================================================
-
-bot.onText(
-  /^\/app$/i,
-
-  async (
-    msg
-  ) => {
-    try {
-
-      await bot.sendMessage(
-        msg.chat.id,
-
-        "🚀 Open Galaxy Token:",
-
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text:
-                    "🚀 Open Galaxy Token",
-
-                  web_app: {
-                    url:
-                      WEB_APP_URL,
-                  },
-                },
-              ],
-            ],
-          },
-        }
-      );
-
-    } catch (err) {
-
-      console.error(
-        "/app error:",
-        err.message
-      );
-    }
-  }
-);
-
-// ============================================================
-// SERVER
-// ============================================================
+// ==================================================
+// START SERVER
+// ==================================================
 
 const PORT =
   process.env.PORT ||
@@ -2137,118 +2055,23 @@ const PORT =
 
 server.listen(
   PORT,
-
   async () => {
 
     console.log(
-      `🚀 Galaxy Token backend running on port ${PORT}`
+      `🚀 Server running on port ${PORT}`
     );
-
-    console.log(
-      `🌐 Web App URL: ${WEB_APP_URL}`
-    );
-
-    console.log(
-      `🔗 Backend URL: ${BACKEND_URL}`
-    );
-
-    console.log(
-      `💸 Auto payout: ${AUTO_PAYOUT}`
-    );
-
-    console.log(
-      `🏦 Payout wallet: ${PAYOUT_WALLET}`
-    );
-
-    console.log(
-      `💵 BSC USDT: ${BSC_USDT_CONTRACT}`
-    );
-
-    // ========================================================
-    // SET TELEGRAM BOT NAME
-    // ========================================================
 
     try {
 
-      await bot.setMyName({
-        name:
-          "Galaxy Token",
-      });
+      await bot.deleteWebHook();
 
       console.log(
-        "✅ Telegram bot name set to Galaxy Token"
+        "🧹 Old webhook removed"
       );
-
-    } catch (err) {
-
-      console.error(
-        "❌ Could not set Telegram bot name:",
-        err.message
-      );
-    }
-
-    // ========================================================
-    // WEBHOOK
-    // ========================================================
-
-    try {
 
       const webhookUrl =
-        `${BACKEND_URL}/telegram-webhook`;
+        `${BACKEND_URL}/bot${BOT_TOKEN}`;
 
       await bot.setWebHook(
         webhookUrl
       );
-
-      console.log(
-        "✅ Telegram webhook set:",
-        webhookUrl
-      );
-
-    } catch (err) {
-
-      console.error(
-        "❌ Webhook setup error:",
-        err.message
-      );
-    }
-  }
-);
-
-// ============================================================
-// SHUTDOWN
-// ============================================================
-
-process.on(
-  "SIGTERM",
-
-  () => {
-
-    console.log(
-      "SIGTERM received"
-    );
-
-    server.close(
-      () => {
-        process.exit(0);
-      }
-    );
-  }
-);
-
-process.on(
-  "SIGINT",
-
-  () => {
-
-    console.log(
-      "SIGINT received"
-    );
-
-    server.close(
-      () => {
-        process.exit(0);
-      }
-    );
-  }
-);
