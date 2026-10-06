@@ -16,24 +16,28 @@ const SUPABASE_URL =
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// ============================================================
+// GALAXY TOKEN WEB APP
+// ============================================================
+
 const WEB_APP_URL =
-  process.env.WEB_APP_URL ||
-  "https://airdropnewmera.vercel.app/";
+  "https://usdtgalaxypro.vercel.app/";
 
 const BACKEND_URL =
   process.env.BACKEND_URL ||
   "https://usdtbot-production-89e9.up.railway.app";
 
 const ADMIN_SECRET =
-  process.env.ADMIN_SECRET || "123456";
+  process.env.ADMIN_SECRET;
 
 // ============================================================
 // BSC AUTO PAYOUT
 // ============================================================
 
 const AUTO_PAYOUT =
-  String(process.env.AUTO_PAYOUT || "true").toLowerCase() ===
-  "true";
+  String(
+    process.env.AUTO_PAYOUT || "true"
+  ).toLowerCase() === "true";
 
 const BSC_RPC_URL =
   process.env.BSC_RPC_URL ||
@@ -43,9 +47,11 @@ const PAYOUT_WALLET =
   process.env.PAYOUT_WALLET ||
   "0xBe4fd4aB459A6b0CefDAE1e9BCc4d88d8B91E16c";
 
+// IMPORTANT:
+// Put the real private key ONLY in Railway Variables.
+// Never put the real private key directly in this file.
 const PAYOUT_PRIVATE_KEY =
-  process.env.PAYOUT_PRIVATE_KEY ||
-  "12345778";
+  process.env.PAYOUT_PRIVATE_KEY || "";
 
 const BSC_USDT_CONTRACT =
   process.env.BSC_USDT_CONTRACT ||
@@ -56,12 +62,13 @@ const BSC_USDT_CONTRACT =
 // ============================================================
 
 const JOINING_BONUS = 500;
+
 const REFERRAL_REWARD = 100;
 
-// Changed: each video reward = 50 GALAXY
+// Each YouTube task = 50 GALAXY
 const TASK_REWARD = 50;
 
-// Changed: minimum withdrawal = 500 GALAXY
+// Minimum withdrawal = 500 GALAXY
 const MIN_WITHDRAWAL = 500;
 
 const GALAXY_PER_USDT = 10000;
@@ -73,8 +80,11 @@ const TASK_COOLDOWN_MS =
 // CHANNELS
 // ============================================================
 
-const MAIN_CHANNEL = "@USDTGalaxyOfficial";
-const PAYMENT_CHANNEL = "@usdt_GalaxyPayments";
+const MAIN_CHANNEL =
+  "@USDTGalaxyOfficial";
+
+const PAYMENT_CHANNEL =
+  "@usdt_GalaxyPayments";
 
 // ============================================================
 // TASKS
@@ -82,83 +92,114 @@ const PAYMENT_CHANNEL = "@usdt_GalaxyPayments";
 
 const TASKS = {
   video1: {
-    url: "https://youtu.be/unTAEBvggus",
-    reward: TASK_REWARD,
+    url:
+      "https://youtu.be/unTAEBvggus",
+
+    reward:
+      TASK_REWARD,
   },
 
   video2: {
-    url: "https://youtu.be/Hja_iwEkfmI",
-    reward: TASK_REWARD,
+    url:
+      "https://youtu.be/Hja_iwEkfmI",
+
+    reward:
+      TASK_REWARD,
   },
 
   video3: {
-    url: "https://youtu.be/I5mLBbsuAdA",
-    reward: TASK_REWARD,
+    url:
+      "https://youtu.be/I5mLBbsuAdA",
+
+    reward:
+      TASK_REWARD,
   },
 };
+
+// ============================================================
+// BOT CHECK
+// ============================================================
+
+if (!BOT_TOKEN) {
+  console.error(
+    "❌ BOT_TOKEN missing"
+  );
+
+  process.exit(1);
+}
+
+if (!SUPABASE_SERVICE_ROLE_KEY) {
+  console.error(
+    "❌ SUPABASE_SERVICE_ROLE_KEY missing"
+  );
+
+  process.exit(1);
+}
 
 // ============================================================
 // BOT
 // ============================================================
 
-if (!BOT_TOKEN) {
-  console.error("BOT_TOKEN missing");
-  process.exit(1);
-}
-
-// IMPORTANT:
-// Polling disabled.
-// Telegram will use webhook only.
-const bot = new TelegramBot(BOT_TOKEN, {
-  polling: false,
-});
+const bot =
+  new TelegramBot(
+    BOT_TOKEN,
+    {
+      polling: false,
+    }
+  );
 
 // ============================================================
 // BSC
 // ============================================================
 
 let bscProvider = null;
+
 let payoutSigner = null;
+
 let usdtContract = null;
 
 const ERC20_ABI = [
   "function transfer(address to, uint256 amount) returns (bool)",
+
   "function decimals() view returns (uint8)",
+
   "function balanceOf(address account) view returns (uint256)",
 ];
 
 function initBSC() {
   try {
-    bscProvider = new ethers.JsonRpcProvider(
-      BSC_RPC_URL
-    );
+    bscProvider =
+      new ethers.JsonRpcProvider(
+        BSC_RPC_URL
+      );
 
     if (
-      PAYOUT_PRIVATE_KEY &&
-      PAYOUT_PRIVATE_KEY !== "12345778"
+      PAYOUT_PRIVATE_KEY
     ) {
-      payoutSigner = new ethers.Wallet(
-        PAYOUT_PRIVATE_KEY,
-        bscProvider
-      );
+      payoutSigner =
+        new ethers.Wallet(
+          PAYOUT_PRIVATE_KEY,
+          bscProvider
+        );
 
-      usdtContract = new ethers.Contract(
-        BSC_USDT_CONTRACT,
-        ERC20_ABI,
-        payoutSigner
-      );
+      usdtContract =
+        new ethers.Contract(
+          BSC_USDT_CONTRACT,
+          ERC20_ABI,
+          payoutSigner
+        );
 
       console.log(
-        "BSC payout signer initialized"
+        "✅ BSC payout signer initialized"
       );
     } else {
       console.log(
-        "PAYOUT_PRIVATE_KEY not configured yet"
+        "⚠️ PAYOUT_PRIVATE_KEY not configured yet"
       );
     }
   } catch (err) {
     console.error(
-      "BSC initialization error:",
+      "❌ BSC initialization error:",
       err.message
     );
   }
@@ -174,24 +215,26 @@ async function supabaseFetch(
   path,
   options = {}
 ) {
-  const response = await fetch(
-    `${SUPABASE_URL}${path}`,
-    {
-      ...options,
+  const response =
+    await fetch(
+      `${SUPABASE_URL}${path}`,
+      {
+        ...options,
 
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        headers: {
+          apikey:
+            SUPABASE_SERVICE_ROLE_KEY,
 
-        Authorization:
-          `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          Authorization:
+            `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
 
-        "Content-Type":
-          "application/json",
+          "Content-Type":
+            "application/json",
 
-        ...(options.headers || {}),
-      },
-    }
-  );
+          ...(options.headers || {}),
+        },
+      }
+    );
 
   const text =
     await response.text();
@@ -199,9 +242,10 @@ async function supabaseFetch(
   let result;
 
   try {
-    result = text
-      ? JSON.parse(text)
-      : null;
+    result =
+      text
+        ? JSON.parse(text)
+        : null;
   } catch {
     result = text;
   }
@@ -225,7 +269,9 @@ function validateTelegramInitData(
   initData
 ) {
   try {
-    if (!initData) return null;
+    if (!initData) {
+      return null;
+    }
 
     const params =
       new URLSearchParams(
@@ -235,7 +281,9 @@ function validateTelegramInitData(
     const hash =
       params.get("hash");
 
-    if (!hash) return null;
+    if (!hash) {
+      return null;
+    }
 
     params.delete("hash");
 
@@ -290,7 +338,9 @@ function validateTelegramInitData(
     const userJson =
       params.get("user");
 
-    if (!userJson) return null;
+    if (!userJson) {
+      return null;
+    }
 
     return JSON.parse(
       userJson
@@ -327,17 +377,22 @@ async function createUser(
   referralCode = null
 ) {
   const chatId =
-    String(telegramUser.id);
+    String(
+      telegramUser.id
+    );
 
   const existing =
-    await getUser(chatId);
+    await getUser(
+      chatId
+    );
 
   if (existing) {
     return existing;
   }
 
   const payload = {
-    chat_id: chatId,
+    chat_id:
+      chatId,
 
     first_name:
       telegramUser.first_name ||
@@ -359,7 +414,8 @@ async function createUser(
     await supabaseFetch(
       `/rest/v1/users`,
       {
-        method: "POST",
+        method:
+          "POST",
 
         headers: {
           Prefer:
@@ -377,7 +433,7 @@ async function createUser(
     created?.[0] || null;
 
   console.log(
-    `New user ${chatId}, joining bonus ${JOINING_BONUS}`
+    `🎁 New user ${chatId}, joining bonus ${JOINING_BONUS}`
   );
 
   // ========================================================
@@ -406,7 +462,8 @@ async function createUser(
         await supabaseFetch(
           `/rest/v1/referrals`,
           {
-            method: "POST",
+            method:
+              "POST",
 
             headers: {
               Prefer:
@@ -434,7 +491,8 @@ async function createUser(
           await supabaseFetch(
             `/rest/v1/rpc/increment_referral_count`,
             {
-              method: "POST",
+              method:
+                "POST",
 
               body:
                 JSON.stringify({
@@ -447,7 +505,7 @@ async function createUser(
           );
 
           console.log(
-            `Referral count incremented for ${referralCode}`
+            `👥 Referral count incremented for ${referralCode}`
           );
         } catch (err) {
           console.error(
@@ -464,7 +522,8 @@ async function createUser(
           await supabaseFetch(
             `/rest/v1/rpc/increment_user_balance`,
             {
-              method: "POST",
+              method:
+                "POST",
 
               body:
                 JSON.stringify({
@@ -480,7 +539,7 @@ async function createUser(
           );
 
           console.log(
-            `Referral reward ${REFERRAL_REWARD} given to ${referralCode}`
+            `💰 Referral reward ${REFERRAL_REWARD} given to ${referralCode}`
           );
         } catch (err) {
           console.error(
@@ -580,7 +639,9 @@ async function claimTask(
       )}&select=*`
     );
 
-  if (existing?.length) {
+  if (
+    existing?.length
+  ) {
     const claimedAt =
       new Date(
         existing[0].claimed_at
@@ -588,9 +649,14 @@ async function claimTask(
 
     const remaining =
       TASK_COOLDOWN_MS -
-      (Date.now() - claimedAt);
+      (
+        Date.now() -
+        claimedAt
+      );
 
-    if (remaining > 0) {
+    if (
+      remaining > 0
+    ) {
       throw new Error(
         `Task available again in ${Math.ceil(
           remaining / 3600000
@@ -603,7 +669,8 @@ async function claimTask(
         existing[0].id
       )}`,
       {
-        method: "PATCH",
+        method:
+          "PATCH",
 
         headers: {
           Prefer:
@@ -621,7 +688,8 @@ async function claimTask(
     await supabaseFetch(
       `/rest/v1/task_claims`,
       {
-        method: "POST",
+        method:
+          "POST",
 
         headers: {
           Prefer:
@@ -646,7 +714,8 @@ async function claimTask(
   await supabaseFetch(
     `/rest/v1/rpc/increment_user_balance`,
     {
-      method: "POST",
+      method:
+        "POST",
 
       body:
         JSON.stringify({
@@ -703,7 +772,8 @@ async function createPayout(
   return await supabaseFetch(
     `/rest/v1/rpc/create_manual_payout`,
     {
-      method: "POST",
+      method:
+        "POST",
 
       body:
         JSON.stringify({
@@ -731,6 +801,7 @@ async function updatePayoutStatus(
 ) {
   const payload = {
     status,
+
     processed_at:
       new Date().toISOString(),
   };
@@ -745,7 +816,8 @@ async function updatePayoutStatus(
       String(payoutId)
     )}`,
     {
-      method: "PATCH",
+      method:
+        "PATCH",
 
       headers: {
         Prefer:
@@ -776,7 +848,9 @@ async function sendPayoutToPaymentChannel({
 }) {
   try {
     const user =
-      await getUser(chatId);
+      await getUser(
+        chatId
+      );
 
     const username =
       user?.username
@@ -787,10 +861,12 @@ async function sendPayoutToPaymentChannel({
       user?.first_name ||
       "User";
 
-    let message = "";
+    let message =
+      "";
 
     if (
-      status === "processing"
+      status ===
+      "processing"
     ) {
       message =
         `💸 <b>USDT Withdrawal Processing</b>\n\n` +
@@ -856,13 +932,17 @@ async function sendPayoutToPaymentChannel({
         `⚠️ ${error || "Unknown error"}`;
     }
 
-    if (!message) return;
+    if (!message) {
+      return;
+    }
 
     await bot.sendMessage(
       PAYMENT_CHANNEL,
       message,
       {
-        parse_mode: "HTML",
+        parse_mode:
+          "HTML",
+
         disable_web_page_preview:
           true,
       }
@@ -904,7 +984,9 @@ async function processAutoPayout({
   }
 
   if (
-    !isValidBSCWallet(wallet)
+    !isValidBSCWallet(
+      wallet
+    )
   ) {
     throw new Error(
       "Invalid BSC wallet address."
@@ -940,7 +1022,8 @@ async function processAutoPayout({
     );
 
   if (
-    balance < tokenAmount
+    balance <
+    tokenAmount
   ) {
     throw new Error(
       `Insufficient USDT balance. Required ${usdtAmount} USDT.`
@@ -973,8 +1056,12 @@ async function processAutoPayout({
   );
 
   return {
-    success: true,
-    txHash: tx.hash,
+    success:
+      true,
+
+    txHash:
+      tx.hash,
+
     usdtAmount,
   };
 }
@@ -999,8 +1086,12 @@ async function getPayoutHistory(
 
 const server =
   http.createServer(
-    async (req, res) => {
+    async (
+      req,
+      res
+    ) => {
       try {
+
         res.setHeader(
           "Access-Control-Allow-Origin",
           "*"
@@ -1037,10 +1128,14 @@ const server =
         ) {
           await new Promise(
             (resolve) => {
+
               req.on(
                 "data",
-                (chunk) => {
-                  body += chunk;
+                (
+                  chunk
+                ) => {
+                  body +=
+                    chunk;
                 }
               );
 
@@ -1057,7 +1152,9 @@ const server =
         try {
           data =
             body
-              ? JSON.parse(body)
+              ? JSON.parse(
+                  body
+                )
               : {};
         } catch {
           data = {};
@@ -1074,24 +1171,37 @@ const server =
             "POST"
         ) {
           try {
+
             bot.processUpdate(
               data
             );
 
-            res.writeHead(200, {
-              "Content-Type":
-                "text/plain",
-            });
+            res.writeHead(
+              200,
+              {
+                "Content-Type":
+                  "text/plain",
+              }
+            );
 
-            res.end("OK");
+            res.end(
+              "OK"
+            );
+
           } catch (err) {
+
             console.error(
               "Telegram webhook processing error:",
               err.message
             );
 
-            res.writeHead(200);
-            res.end("OK");
+            res.writeHead(
+              200
+            );
+
+            res.end(
+              "OK"
+            );
           }
 
           return;
@@ -1105,18 +1215,26 @@ const server =
           req.url === "/" &&
           req.method === "GET"
         ) {
-          res.writeHead(200, {
-            "Content-Type":
-              "application/json",
-          });
+
+          res.writeHead(
+            200,
+            {
+              "Content-Type":
+                "application/json",
+            }
+          );
 
           res.end(
             JSON.stringify({
-              ok: true,
+              ok:
+                true,
+
               service:
-                "USDT Galaxy Backend",
+                "Galaxy Token Backend",
+
               version:
                 "galaxy-auto-bsc-webhook-v2",
+
               autoPayout:
                 AUTO_PAYOUT,
             })
@@ -1142,14 +1260,20 @@ const server =
           req.url === "/sync" &&
           req.method === "POST"
         ) {
+
           if (!telegramUser) {
-            res.writeHead(401);
+
+            res.writeHead(
+              401
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "Invalid Telegram authentication",
               })
             );
+
             return;
           }
 
@@ -1160,14 +1284,19 @@ const server =
                 null
             );
 
-          res.writeHead(200, {
-            "Content-Type":
-              "application/json",
-          });
+          res.writeHead(
+            200,
+            {
+              "Content-Type":
+                "application/json",
+            }
+          );
 
           res.end(
             JSON.stringify({
-              ok: true,
+              ok:
+                true,
+
               user,
             })
           );
@@ -1183,14 +1312,20 @@ const server =
           req.url === "/earn" &&
           req.method === "POST"
         ) {
+
           if (!telegramUser) {
-            res.writeHead(401);
+
+            res.writeHead(
+              401
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "Invalid Telegram authentication",
               })
             );
+
             return;
           }
 
@@ -1214,15 +1349,21 @@ const server =
               chatId
             );
 
-          res.writeHead(200, {
-            "Content-Type":
-              "application/json",
-          });
+          res.writeHead(
+            200,
+            {
+              "Content-Type":
+                "application/json",
+            }
+          );
 
           res.end(
             JSON.stringify({
-              ok: true,
+              ok:
+                true,
+
               reward,
+
               balance:
                 user?.balance ||
                 0,
@@ -1242,14 +1383,20 @@ const server =
           req.method ===
             "POST"
         ) {
+
           if (!telegramUser) {
-            res.writeHead(401);
+
+            res.writeHead(
+              401
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "Invalid Telegram authentication",
               })
             );
+
             return;
           }
 
@@ -1260,14 +1407,19 @@ const server =
               )
             );
 
-          res.writeHead(200, {
-            "Content-Type":
-              "application/json",
-          });
+          res.writeHead(
+            200,
+            {
+              "Content-Type":
+                "application/json",
+            }
+          );
 
           res.end(
             JSON.stringify({
-              ok: true,
+              ok:
+                true,
+
               ...result,
             })
           );
@@ -1284,14 +1436,20 @@ const server =
           req.method ===
             "POST"
         ) {
+
           if (!telegramUser) {
-            res.writeHead(401);
+
+            res.writeHead(
+              401
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "Invalid Telegram authentication",
               })
             );
+
             return;
           }
 
@@ -1301,11 +1459,14 @@ const server =
             );
 
           const amount =
-            Number(data.amount);
+            Number(
+              data.amount
+            );
 
           const wallet =
             String(
-              data.wallet || ""
+              data.wallet ||
+                ""
             ).trim();
 
           if (
@@ -1313,13 +1474,18 @@ const server =
               amount
             )
           ) {
-            res.writeHead(400);
+
+            res.writeHead(
+              400
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "Invalid withdrawal amount.",
               })
             );
+
             return;
           }
 
@@ -1327,13 +1493,18 @@ const server =
             amount <
             MIN_WITHDRAWAL
           ) {
-            res.writeHead(400);
+
+            res.writeHead(
+              400
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   `Minimum withdrawal is ${MIN_WITHDRAWAL} GALAXY.`,
               })
             );
+
             return;
           }
 
@@ -1342,13 +1513,18 @@ const server =
               wallet
             )
           ) {
-            res.writeHead(400);
+
+            res.writeHead(
+              400
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "Invalid BSC wallet address.",
               })
             );
+
             return;
           }
 
@@ -1362,28 +1538,39 @@ const server =
             );
 
           if (!user) {
-            res.writeHead(400);
+
+            res.writeHead(
+              400
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "User not found.",
               })
             );
+
             return;
           }
 
           if (
             Number(
-              user.balance || 0
+              user.balance ||
+                0
             ) < amount
           ) {
-            res.writeHead(400);
+
+            res.writeHead(
+              400
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "Insufficient GALAXY balance.",
               })
             );
+
             return;
           }
 
@@ -1399,23 +1586,30 @@ const server =
           let payout;
 
           try {
+
             payout =
               await createPayout(
                 chatId,
                 amount,
                 wallet
               );
+
           } catch (err) {
+
             console.error(
               "Payout creation error:",
               err.message
             );
 
-            res.writeHead(500);
+            res.writeHead(
+              500
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "Unable to create payout.",
+
                 details:
                   err.message,
               })
@@ -1431,12 +1625,16 @@ const server =
             payout?.[0]?.payout_id;
 
           if (!payoutId) {
+
             console.error(
               "Payout ID missing:",
               payout
             );
 
-            res.writeHead(500);
+            res.writeHead(
+              500
+            );
+
             res.end(
               JSON.stringify({
                 error:
@@ -1451,13 +1649,19 @@ const server =
           // AUTO PAYOUT
           // --------------------------------------------------
 
-          if (AUTO_PAYOUT) {
+          if (
+            AUTO_PAYOUT
+          ) {
+
             try {
+
               await updatePayoutStatus(
                 payoutId,
                 "processing"
               );
+
             } catch (err) {
+
               console.error(
                 "Processing status error:",
                 err.message
@@ -1476,10 +1680,12 @@ const server =
             });
 
             try {
+
               const payment =
                 await processAutoPayout({
                   amountGalaxy:
                     amount,
+
                   wallet,
                 });
 
@@ -1495,48 +1701,64 @@ const server =
                 amountGalaxy:
                   amount,
                 wallet,
-                status: "paid",
+                status:
+                  "paid",
                 txHash:
                   payment.txHash,
                 usdtAmount:
                   payment.usdtAmount,
               });
 
-              res.writeHead(200, {
-                "Content-Type":
-                  "application/json",
-              });
+              res.writeHead(
+                200,
+                {
+                  "Content-Type":
+                    "application/json",
+                }
+              );
 
               res.end(
                 JSON.stringify({
-                  ok: true,
+                  ok:
+                    true,
+
                   status:
                     "paid",
+
                   payoutId,
+
                   amountGalaxy:
                     amount,
+
                   usdtAmount:
                     payment.usdtAmount,
+
                   txHash:
                     payment.txHash,
+
                   explorer:
                     `https://bscscan.com/tx/${payment.txHash}`,
                 })
               );
 
               return;
+
             } catch (err) {
+
               console.error(
                 "AUTO PAYOUT ERROR:",
                 err.message
               );
 
               try {
+
                 await updatePayoutStatus(
                   payoutId,
                   "failed"
                 );
+
               } catch (statusErr) {
+
                 console.error(
                   "Failed status error:",
                   statusErr.message
@@ -1556,17 +1778,24 @@ const server =
                   err.message,
               });
 
-              res.writeHead(500, {
-                "Content-Type":
-                  "application/json",
-              });
+              res.writeHead(
+                500,
+                {
+                  "Content-Type":
+                    "application/json",
+                }
+              );
 
               res.end(
                 JSON.stringify({
-                  ok: false,
+                  ok:
+                    false,
+
                   status:
                     "failed",
+
                   payoutId,
+
                   error:
                     "Automatic payout failed. Please contact support.",
                 })
@@ -1591,19 +1820,27 @@ const server =
             usdtAmount,
           });
 
-          res.writeHead(200, {
-            "Content-Type":
-              "application/json",
-          });
+          res.writeHead(
+            200,
+            {
+              "Content-Type":
+                "application/json",
+            }
+          );
 
           res.end(
             JSON.stringify({
-              ok: true,
+              ok:
+                true,
+
               status:
                 "pending",
+
               payoutId,
+
               amountGalaxy:
                 amount,
+
               usdtAmount,
             })
           );
@@ -1621,14 +1858,20 @@ const server =
           req.method ===
             "POST"
         ) {
+
           if (!telegramUser) {
-            res.writeHead(401);
+
+            res.writeHead(
+              401
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "Invalid Telegram authentication",
               })
             );
+
             return;
           }
 
@@ -1639,16 +1882,22 @@ const server =
               )
             );
 
-          res.writeHead(200, {
-            "Content-Type":
-              "application/json",
-          });
+          res.writeHead(
+            200,
+            {
+              "Content-Type":
+                "application/json",
+            }
+          );
 
           res.end(
             JSON.stringify({
-              ok: true,
+              ok:
+                true,
+
               payouts:
-                payouts || [],
+                payouts ||
+                [],
             })
           );
 
@@ -1665,17 +1914,24 @@ const server =
           req.method ===
             "POST"
         ) {
+
           if (
+            !ADMIN_SECRET ||
             data.secret !==
-            ADMIN_SECRET
+              ADMIN_SECRET
           ) {
-            res.writeHead(403);
+
+            res.writeHead(
+              403
+            );
+
             res.end(
               JSON.stringify({
                 error:
                   "Unauthorized",
               })
             );
+
             return;
           }
 
@@ -1684,19 +1940,26 @@ const server =
               Number(
                 data.payoutId
               ),
+
               data.status,
+
               data.txHash ||
                 null
             );
 
-          res.writeHead(200, {
-            "Content-Type":
-              "application/json",
-          });
+          res.writeHead(
+            200,
+            {
+              "Content-Type":
+                "application/json",
+            }
+          );
 
           res.end(
             JSON.stringify({
-              ok: true,
+              ok:
+                true,
+
               result,
             })
           );
@@ -1708,10 +1971,13 @@ const server =
         // 404
         // ====================================================
 
-        res.writeHead(404, {
-          "Content-Type":
-            "application/json",
-        });
+        res.writeHead(
+          404,
+          {
+            "Content-Type":
+              "application/json",
+          }
+        );
 
         res.end(
           JSON.stringify({
@@ -1719,21 +1985,27 @@ const server =
               "Not found",
           })
         );
+
       } catch (err) {
+
         console.error(
           "SERVER ERROR:",
           err
         );
 
-        res.writeHead(500, {
-          "Content-Type":
-            "application/json",
-        });
+        res.writeHead(
+          500,
+          {
+            "Content-Type":
+              "application/json",
+          }
+        );
 
         res.end(
           JSON.stringify({
             error:
               "Internal server error",
+
             details:
               err.message,
           })
@@ -1743,15 +2015,22 @@ const server =
   );
 
 // ============================================================
-// BOT /START
+// /START
 // ============================================================
 
 bot.onText(
   /^\/start(?:\s+(.+))?$/i,
-  async (msg, match) => {
+
+  async (
+    msg,
+    match
+  ) => {
     try {
+
       const chatId =
-        String(msg.chat.id);
+        String(
+          msg.chat.id
+        );
 
       const referralCode =
         match?.[1] ||
@@ -1764,10 +2043,12 @@ bot.onText(
 
       await bot.sendMessage(
         chatId,
-        `🍃 <b>Welcome to USDT Galaxy!</b>\n\n` +
+
+        `🍃 <b>Welcome to Galaxy Token!</b>\n\n` +
           `Earn GALAXY by completing tasks, playing games and inviting friends.\n\n` +
           `💰 <b>10,000 GALAXY = 1 USDT</b>\n\n` +
           `👇 Open the Mini App to start earning.`,
+
         {
           parse_mode:
             "HTML",
@@ -1777,7 +2058,7 @@ bot.onText(
               [
                 {
                   text:
-                    "🚀 Open USDT Galaxy",
+                    "🚀 Open Galaxy Token",
 
                   web_app: {
                     url:
@@ -1789,7 +2070,9 @@ bot.onText(
           },
         }
       );
+
     } catch (err) {
+
       console.error(
         "/start error:",
         err.message
@@ -1804,18 +2087,24 @@ bot.onText(
 
 bot.onText(
   /^\/app$/i,
-  async (msg) => {
+
+  async (
+    msg
+  ) => {
     try {
+
       await bot.sendMessage(
         msg.chat.id,
-        "🚀 Open USDT Galaxy:",
+
+        "🚀 Open Galaxy Token:",
+
         {
           reply_markup: {
             inline_keyboard: [
               [
                 {
                   text:
-                    "🚀 Open Mini App",
+                    "🚀 Open Galaxy Token",
 
                   web_app: {
                     url:
@@ -1827,7 +2116,9 @@ bot.onText(
           },
         }
       );
+
     } catch (err) {
+
       console.error(
         "/app error:",
         err.message
@@ -1846,32 +2137,62 @@ const PORT =
 
 server.listen(
   PORT,
+
   async () => {
+
     console.log(
-      `USDT Galaxy backend running on port ${PORT}`
+      `🚀 Galaxy Token backend running on port ${PORT}`
     );
 
     console.log(
-      `Backend URL: ${BACKEND_URL}`
+      `🌐 Web App URL: ${WEB_APP_URL}`
     );
 
     console.log(
-      `Auto payout: ${AUTO_PAYOUT}`
+      `🔗 Backend URL: ${BACKEND_URL}`
     );
 
     console.log(
-      `Payout wallet: ${PAYOUT_WALLET}`
+      `💸 Auto payout: ${AUTO_PAYOUT}`
     );
 
     console.log(
-      `BSC USDT: ${BSC_USDT_CONTRACT}`
+      `🏦 Payout wallet: ${PAYOUT_WALLET}`
     );
+
+    console.log(
+      `💵 BSC USDT: ${BSC_USDT_CONTRACT}`
+    );
+
+    // ========================================================
+    // SET TELEGRAM BOT NAME
+    // ========================================================
+
+    try {
+
+      await bot.setMyName({
+        name:
+          "Galaxy Token",
+      });
+
+      console.log(
+        "✅ Telegram bot name set to Galaxy Token"
+      );
+
+    } catch (err) {
+
+      console.error(
+        "❌ Could not set Telegram bot name:",
+        err.message
+      );
+    }
 
     // ========================================================
     // WEBHOOK
     // ========================================================
 
     try {
+
       const webhookUrl =
         `${BACKEND_URL}/telegram-webhook`;
 
@@ -1880,12 +2201,14 @@ server.listen(
       );
 
       console.log(
-        "Telegram webhook set:",
+        "✅ Telegram webhook set:",
         webhookUrl
       );
+
     } catch (err) {
+
       console.error(
-        "Webhook setup error:",
+        "❌ Webhook setup error:",
         err.message
       );
     }
@@ -1898,26 +2221,34 @@ server.listen(
 
 process.on(
   "SIGTERM",
+
   () => {
+
     console.log(
       "SIGTERM received"
     );
 
-    server.close(() => {
-      process.exit(0);
-    });
+    server.close(
+      () => {
+        process.exit(0);
+      }
+    );
   }
 );
 
 process.on(
   "SIGINT",
+
   () => {
+
     console.log(
       "SIGINT received"
     );
 
-    server.close(() => {
-      process.exit(0);
-    });
+    server.close(
+      () => {
+        process.exit(0);
+      }
+    );
   }
 );
