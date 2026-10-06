@@ -517,6 +517,7 @@ async function verifyChannels(
 
 // =========================================================
 // /START COMMAND
+// ONLY OPEN NX COIN BUTTON
 // =========================================================
 
 bot.onText(
@@ -569,36 +570,6 @@ bot.onText(
           [
             {
               text:
-                "📢 Join Main Channel",
-
-              url:
-                "https://t.me/NXCoinOfficial"
-            }
-          ],
-
-          [
-            {
-              text:
-                "💳 Join Payment Channel",
-
-              url:
-                "https://t.me/NXCoinPayments"
-            }
-          ],
-
-          [
-            {
-              text:
-                "✅ Verify Channels",
-
-              callback_data:
-                "verify_channels"
-            }
-          ],
-
-          [
-            {
-              text:
                 "🚀 Open NX Coin",
 
               web_app: {
@@ -613,13 +584,11 @@ bot.onText(
       await bot.sendMessage(
         chatId,
 
-        `🪙 Welcome to ${CONFIG.APP_NAME}!
+        `🪙 Welcome to NX Coin!
 
 🎁 You received 500 NX Coins joining bonus.
 
-Complete tasks, invite friends and earn more NX Coins.
-
-Before earning, join both official channels and verify your membership.`,
+Complete tasks, invite friends and earn more NX Coins.`,
 
         {
           reply_markup:
@@ -632,76 +601,6 @@ Before earning, join both official channels and verify your membership.`,
         "/start error:",
         error
       );
-    }
-  }
-);
-
-// =========================================================
-// CALLBACK BUTTONS
-// =========================================================
-
-bot.on(
-  "callback_query",
-  async (query) => {
-    try {
-      const chatId =
-        query.from.id;
-
-      if (
-        query.data ===
-        "verify_channels"
-      ) {
-        const result =
-          await verifyChannels(
-            chatId
-          );
-
-        if (
-          result.verified
-        ) {
-          await bot.answerCallbackQuery(
-            query.id,
-            {
-              text:
-                "✅ Channels verified!",
-              show_alert: true
-            }
-          );
-
-          await bot.sendMessage(
-            chatId,
-
-            "✅ Verification successful!\n\nYou can now open NX Coin and start earning."
-          );
-
-        } else {
-          await bot.answerCallbackQuery(
-            query.id,
-            {
-              text:
-                "❌ Please join both channels first.",
-              show_alert: true
-            }
-          );
-        }
-      }
-
-    } catch (error) {
-      console.error(
-        "Callback error:",
-        error
-      );
-
-      try {
-        await bot.answerCallbackQuery(
-          query.id,
-          {
-            text:
-              "Something went wrong.",
-            show_alert: true
-          }
-        );
-      } catch {}
     }
   }
 );
@@ -1079,7 +978,7 @@ const server =
       try {
 
         // -------------------------------------------------
-        // CORS PREFLIGHT
+        // CORS
         // -------------------------------------------------
 
         if (
@@ -1816,9 +1715,8 @@ server.listen(
       `Payment channel: ${CONFIG.PAYMENT_CHANNEL}`
     );
 
-    // IMPORTANT:
+    // Bot name is already set in Telegram.
     // setMyName() intentionally removed.
-    // Bot name is already configured in Telegram.
 
     // Webhook is configured independently.
     try {
