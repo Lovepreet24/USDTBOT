@@ -978,11 +978,6 @@ async function processAutoPayout(
         ? `${payout.wallet.slice(0, 8)}...${payout.wallet.slice(-6)}`
         : payout.wallet;
 
-    const shortTx =
-      tx.hash.length > 18
-        ? `${tx.hash.slice(0, 10)}...${tx.hash.slice(-8)}`
-        : tx.hash;
-
     // =====================================================
     // USER PAYMENT MESSAGE
     // =====================================================
@@ -1012,18 +1007,28 @@ async function processAutoPayout(
     // PROFESSIONAL PAYMENT CHANNEL MESSAGE
     // =====================================================
 
+    /*
+      FULL TX HASH
+      + CLICKABLE BSCScan LINK
+      + USER ID
+      + USERNAME BELOW USER ID
+    */
+
     try {
+      const bscScanUrl =
+        `https://bscscan.com/tx/${tx.hash}`;
+
       await bot.sendMessage(
         CONFIG.PAYMENT_CHANNEL,
 
         `💸 <b>NX COIN — PAYMENT SENT</b>
 
-👤 <b>User:</b> ${escapeTelegramHtml(
-          username
-        )}
-🆔 <b>ID:</b> <code>${escapeTelegramHtml(
+🆔 <b>User ID:</b> <code>${escapeTelegramHtml(
           payout.chat_id
         )}</code>
+👤 <b>Username:</b> ${escapeTelegramHtml(
+          username
+        )}
 
 🪙 <b>Amount:</b> ${escapeTelegramHtml(
           payout.amount_nx
@@ -1037,8 +1042,11 @@ async function processAutoPayout(
 
 🔗 <b>TX Hash:</b>
 <code>${escapeTelegramHtml(
-          shortTx
+          tx.hash
         )}</code>
+
+🌐 <b>BSCScan:</b>
+<a href="${bscScanUrl}">View Transaction</a>
 
 ✅ <b>Status:</b> PAID`,
 
