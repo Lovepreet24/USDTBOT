@@ -1,6 +1,7 @@
 const TelegramBot = require("node-telegram-bot-api");
 const http = require("http");
 const crypto = require("crypto");
+const { ethers } = require("ethers");
 
 // ==================================================
 // CONFIG
@@ -26,12 +27,36 @@ const ADMIN_SECRET =
   process.env.ADMIN_SECRET;
 
 // ==================================================
+// AUTO PAYOUT CONFIG
+// ==================================================
+
+const PAYOUT_PRIVATE_KEY =
+  process.env.PAYOUT_PRIVATE_KEY;
+
+const PAYOUT_WALLET =
+  process.env.PAYOUT_WALLET;
+
+const BSC_RPC_URL =
+  process.env.BSC_RPC_URL ||
+  "https://bsc-dataseed.binance.org/";
+
+// Official BSC USDT contract
+const USDT_CONTRACT =
+  "0x55d398326f99059fF775485246999027B3197955";
+
+// BSC USDT uses 18 decimals
+const USDT_DECIMALS = 18;
+
+// ==================================================
 // REWARDS
 // ==================================================
 
 const STARTING_BALANCE = 500;
+
 const REFERRAL_REWARD = 100;
+
 const EARN_AMOUNT = 50;
+
 const MIN_WITHDRAWAL = 500;
 
 const GALAXY_PER_USDT = 10000;
@@ -59,11 +84,13 @@ const YOUTUBE_TASKS = [
     url: "https://youtu.be/unTAEBvggus",
     reward: EARN_AMOUNT
   },
+
   {
     id: "video2",
     url: "https://youtu.be/Hja_iwEkfmI",
     reward: EARN_AMOUNT
   },
+
   {
     id: "video3",
     url: "https://youtu.be/I5mLBbsuAdA",
@@ -76,7 +103,10 @@ const YOUTUBE_TASKS = [
 // ==================================================
 
 if (!BOT_TOKEN) {
-  console.error("❌ BOT_TOKEN missing");
+  console.error(
+    "❌ BOT_TOKEN missing"
+  );
+
   process.exit(1);
 }
 
@@ -84,23 +114,116 @@ if (!SUPABASE_SERVICE_ROLE_KEY) {
   console.error(
     "❌ SUPABASE_SERVICE_ROLE_KEY missing"
   );
+
   process.exit(1);
+}
+
+if (!PAYOUT_PRIVATE_KEY) {
+  console.warn(
+    "⚠️ PAYOUT_PRIVATE_KEY missing. Auto payout disabled."
+  );
+}
+
+if (!PAYOUT_WALLET) {
+  console.warn(
+    "⚠️ PAYOUT_WALLET missing. Auto payout disabled."
+  );
 }
 
 if (!ADMIN_SECRET) {
   console.warn(
-    "⚠️ ADMIN_SECRET missing"
+    "⚠️ ADMIN_SECRET missing."
   );
 }
 
-console.log("🌌 Galaxy Token starting...");
+console.log(
+  "🌌 Galaxy Token starting..."
+);
 
 // ==================================================
 // TELEGRAM BOT
 // ==================================================
 
 const bot =
-  new TelegramBot(BOT_TOKEN);
+  new TelegramBot(
+    BOT_TOKEN
+  );
+
+// ==================================================
+// BSC PROVIDER
+// ==================================================
+
+let bscProvider = null;
+
+let payoutWallet = null;
+
+let usdtContract = null;
+
+try {
+
+  if (
+    PAYOUT_PRIVATE_KEY &&
+    PAYOUT_WALLET
+  ) {
+
+    bscProvider =
+      new ethers.JsonRpcProvider(
+        BSC_RPC_URL
+      );
+
+    payoutWallet =
+      new ethers.Wallet(
+        PAYOUT_PRIVATE_KEY,
+        bscProvider
+      );
+
+    if (
+      payoutWallet.address.toLowerCase() !==
+      PAYOUT_WALLET.toLowerCase()
+    ) {
+
+      console.error(
+        "❌ PAYOUT_PRIVATE_KEY does not match PAYOUT_WALLET"
+      );
+
+      payoutWallet = null;
+
+    } else {
+
+      const USDT_ABI = [
+        "function transfer(address to,uint256 amount) returns (bool)",
+        "function balanceOf(address account) view returns (uint256)",
+        "function decimals() view returns (uint8)"
+      ];
+
+      usdtContract =
+        new ethers.Contract(
+          USDT_CONTRACT,
+          USDT_ABI,
+          payoutWallet
+        );
+
+      console.log(
+        "💰 Auto payout wallet:",
+        payoutWallet.address
+      );
+
+      console.log(
+        "🌐 BSC RPC:",
+        BSC_RPC_URL
+      );
+    }
+
+  }
+
+} catch (error) {
+
+  console.error(
+    "❌ BSC initialization failed:",
+    error?.message ||
+    error
+  );
+}
 
 // ==================================================
 // SUPABASE REQUEST
@@ -110,25 +233,27 @@ async function supabaseRequest(
   path,
   options = {}
 ) {
-  const response = await fetch(
-    `${SUPABASE_URL}${path}`,
-    {
-      ...options,
 
-      headers: {
-        apikey:
-          SUPABASE_SERVICE_ROLE_KEY,
+  const response =
+    await fetch(
+      `${SUPABASE_URL}${path}`,
+      {
+        ...options,
 
-        Authorization:
-          `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        headers: {
+          apikey:
+            SUPABASE_SERVICE_ROLE_KEY,
 
-        "Content-Type":
-          "application/json",
+          Authorization:
+            `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
 
-        ...(options.headers || {})
+          "Content-Type":
+            "application/json",
+
+          ...(options.headers || {})
+        }
       }
-    }
-  );
+    );
 
   const text =
     await response.text();
@@ -136,15 +261,19 @@ async function supabaseRequest(
   let data = null;
 
   try {
+
     data =
       text
         ? JSON.parse(text)
         : null;
+
   } catch {
+
     data = text;
   }
 
   if (!response.ok) {
+
     console.error(
       "❌ Supabase error:",
       response.status,
@@ -163,7 +292,10 @@ async function supabaseRequest(
 // GET USER
 // ==================================================
 
-async function getUser(chatId) {
+async function getUser(
+  chatId
+) {
+
   const data =
     await supabaseRequest(
       `/rest/v1/users?chat_id=eq.${encodeURIComponent(
@@ -175,6 +307,7 @@ async function getUser(chatId) {
     Array.isArray(data) &&
     data.length > 0
   ) {
+
     return data[0];
   }
 
@@ -189,12 +322,15 @@ async function registerUser(
   chatId,
   referrerId = null
 ) {
+
   try {
+
     const result =
       await supabaseRequest(
         "/rest/v1/rpc/register_user",
         {
-          method: "POST",
+          method:
+            "POST",
 
           body:
             JSON.stringify({
@@ -213,12 +349,14 @@ async function registerUser(
       Array.isArray(result) &&
       result.length > 0
     ) {
+
       return result[0];
     }
 
     return result;
 
   } catch (error) {
+
     console.error(
       "❌ Register user error:",
       error
@@ -237,10 +375,14 @@ async function registerUser(
 async function ensureUser(
   chatId
 ) {
+
   let user =
-    await getUser(chatId);
+    await getUser(
+      chatId
+    );
 
   if (!user) {
+
     user =
       await registerUser(
         chatId,
@@ -258,27 +400,35 @@ async function ensureUser(
 function verifyTelegramInitData(
   initData
 ) {
+
   if (
     !initData ||
     typeof initData !== "string"
   ) {
+
     return null;
   }
 
   try {
+
     const params =
       new URLSearchParams(
         initData
       );
 
     const receivedHash =
-      params.get("hash");
+      params.get(
+        "hash"
+      );
 
     if (!receivedHash) {
+
       return null;
     }
 
-    params.delete("hash");
+    params.delete(
+      "hash"
+    );
 
     const dataCheckString =
       [...params.entries()]
@@ -298,7 +448,9 @@ function verifyTelegramInitData(
           "sha256",
           "WebAppData"
         )
-        .update(BOT_TOKEN)
+        .update(
+          BOT_TOKEN
+        )
         .digest();
 
     const calculatedHash =
@@ -307,13 +459,18 @@ function verifyTelegramInitData(
           "sha256",
           secretKey
         )
-        .update(dataCheckString)
-        .digest("hex");
+        .update(
+          dataCheckString
+        )
+        .digest(
+          "hex"
+        );
 
     if (
       calculatedHash !==
       receivedHash
     ) {
+
       console.error(
         "❌ Telegram hash mismatch"
       );
@@ -323,10 +480,13 @@ function verifyTelegramInitData(
 
     const authDate =
       Number(
-        params.get("auth_date")
+        params.get(
+          "auth_date"
+        )
       );
 
     if (!authDate) {
+
       return null;
     }
 
@@ -339,6 +499,7 @@ function verifyTelegramInitData(
       age < 0 ||
       age > 86400
     ) {
+
       console.error(
         "❌ Telegram initData expired"
       );
@@ -347,9 +508,12 @@ function verifyTelegramInitData(
     }
 
     const userString =
-      params.get("user");
+      params.get(
+        "user"
+      );
 
     if (!userString) {
+
       return null;
     }
 
@@ -358,13 +522,17 @@ function verifyTelegramInitData(
         userString
       );
 
-    if (!telegramUser.id) {
+    if (
+      !telegramUser.id
+    ) {
+
       return null;
     }
 
     return telegramUser;
 
   } catch (error) {
+
     console.error(
       "❌ Telegram verification error:",
       error
@@ -382,7 +550,9 @@ async function checkChannel(
   channelUsername,
   telegramUserId
 ) {
+
   try {
+
     const member =
       await bot.getChatMember(
         channelUsername,
@@ -403,20 +573,30 @@ async function checkChannel(
 
     return {
       joined,
+
       status:
-        status || "unknown",
-      error: null
+        status ||
+        "unknown",
+
+      error:
+        null
     };
 
   } catch (error) {
+
     console.error(
       `❌ Channel check failed ${channelUsername}:`,
-      error?.message || error
+      error?.message ||
+      error
     );
 
     return {
-      joined: false,
-      status: "api_error",
+      joined:
+        false,
+
+      status:
+        "api_error",
+
       error:
         error?.message ||
         "Telegram API error"
@@ -431,6 +611,7 @@ async function checkChannel(
 async function verifyChannels(
   telegramUserId
 ) {
+
   const main =
     await checkChannel(
       MAIN_CHANNEL,
@@ -444,11 +625,13 @@ async function verifyChannels(
     );
 
   return {
+
     joined:
       main.joined &&
       payments.joined,
 
     main,
+
     payments
   };
 }
@@ -460,8 +643,11 @@ async function verifyChannels(
 async function handleStart(
   msg
 ) {
+
   const chatId =
-    String(msg.chat.id);
+    String(
+      msg.chat.id
+    );
 
   console.log(
     `📲 /start from ${chatId}`
@@ -475,26 +661,36 @@ async function handleStart(
       .trim()
       .split(/\s+/);
 
-  let referrerId = null;
+  let referrerId =
+    null;
 
   if (
     parts.length >= 2 &&
-    /^\d+$/.test(parts[1])
+    /^\d+$/.test(
+      parts[1]
+    )
   ) {
+
     referrerId =
       parts[1];
 
     if (
-      referrerId === chatId
+      referrerId ===
+      chatId
     ) {
-      referrerId = null;
+
+      referrerId =
+        null;
     }
   }
 
   const existingUser =
-    await getUser(chatId);
+    await getUser(
+      chatId
+    );
 
   if (!existingUser) {
+
     await registerUser(
       chatId,
       referrerId
@@ -505,6 +701,7 @@ async function handleStart(
     );
 
     if (referrerId) {
+
       console.log(
         `👥 Referral: ${referrerId}`
       );
@@ -517,11 +714,15 @@ async function handleStart(
     "🌌 *Galaxy Token*\n\n🚀 Open the Mini App to access your Galaxy account.",
 
     {
-      parse_mode: "Markdown",
+      parse_mode:
+        "Markdown",
 
       reply_markup: {
+
         inline_keyboard: [
+
           [
+
             {
               text:
                 "🚀 Open Galaxy Token",
@@ -531,7 +732,9 @@ async function handleStart(
                   WEB_APP_URL
               }
             }
+
           ]
+
         ]
       }
     }
@@ -542,14 +745,22 @@ async function handleStart(
 // READ REQUEST BODY
 // ==================================================
 
-function readBody(req) {
+function readBody(
+  req
+) {
+
   return new Promise(
-    (resolve, reject) => {
+    (
+      resolve,
+      reject
+    ) => {
+
       let body = "";
 
       req.on(
         "data",
         chunk => {
+
           body +=
             chunk.toString();
         }
@@ -558,7 +769,10 @@ function readBody(req) {
       req.on(
         "end",
         () => {
-          resolve(body);
+
+          resolve(
+            body
+          );
         }
       );
 
@@ -579,6 +793,7 @@ function sendJson(
   statusCode,
   data
 ) {
+
   res.writeHead(
     statusCode,
     {
@@ -588,7 +803,9 @@ function sendJson(
   );
 
   res.end(
-    JSON.stringify(data)
+    JSON.stringify(
+      data
+    )
   );
 }
 
@@ -599,9 +816,382 @@ function sendJson(
 function authenticate(
   parsed
 ) {
+
   return verifyTelegramInitData(
     parsed?.initData
   );
+}
+
+// ==================================================
+// SEND PAYMENT CHANNEL MESSAGE
+// ==================================================
+
+async function sendPaymentChannelMessage(
+  payout
+) {
+
+  try {
+
+    const amount =
+      Number(
+        payout.amount || 0
+      );
+
+    const usdt =
+      amount /
+      GALAXY_PER_USDT;
+
+    const txHash =
+      payout.tx_hash ||
+      payout.txHash ||
+      "";
+
+    const wallet =
+      payout.wallet_address ||
+      payout.wallet ||
+      "";
+
+    const shortWallet =
+      wallet.length > 18
+        ? `${wallet.slice(
+            0,
+            8
+          )}...${wallet.slice(
+            -6
+          )}`
+        : wallet;
+
+    const message =
+      `💸 *Galaxy Token Payment*\n\n` +
+
+      `✅ Payment Sent Successfully\n\n` +
+
+      `👤 User ID: \`${payout.chat_id || "User"}\`\n` +
+
+      `💰 Amount: *${amount.toLocaleString()} GALAXY*\n` +
+
+      `💵 USDT: *${usdt.toFixed(6)} USDT*\n` +
+
+      `👛 Wallet: \`${shortWallet}\`\n\n` +
+
+      `🔗 TX Hash:\n` +
+
+      `\`${txHash}\`\n\n` +
+
+      `🌐 BSCScan:\n` +
+
+      `https://bscscan.com/tx/${txHash}`;
+
+    await bot.sendMessage(
+      PAYMENT_CHANNEL,
+      message,
+      {
+        parse_mode:
+          "Markdown",
+
+        disable_web_page_preview:
+          true
+      }
+    );
+
+    console.log(
+      "📢 Payment channel message sent"
+    );
+
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      "❌ Payment channel message failed:",
+      error?.message ||
+      error
+    );
+
+    return false;
+  }
+}
+
+// ==================================================
+// AUTO PAYOUT
+// ==================================================
+
+async function processAutoPayout(
+  payoutId
+) {
+
+  if (
+    !payoutWallet ||
+    !usdtContract
+  ) {
+
+    throw new Error(
+      "AUTO_PAYOUT_NOT_CONFIGURED"
+    );
+  }
+
+  // Get exact payout from database
+
+  const rows =
+    await supabaseRequest(
+      `/rest/v1/payouts?id=eq.${encodeURIComponent(
+        payoutId
+      )}&select=*`
+    );
+
+  if (
+    !Array.isArray(rows) ||
+    rows.length === 0
+  ) {
+
+    throw new Error(
+      "PAYOUT_NOT_FOUND"
+    );
+  }
+
+  const payout =
+    rows[0];
+
+  // Don't pay twice
+
+  if (
+    payout.status ===
+      "paid" &&
+    payout.tx_hash
+  ) {
+
+    console.log(
+      `⚠️ Payout ${payoutId} already paid`
+    );
+
+    return {
+      success:
+        true,
+
+      alreadyPaid:
+        true,
+
+      txHash:
+        payout.tx_hash,
+
+      payout
+    };
+  }
+
+  if (
+    payout.status ===
+      "rejected"
+  ) {
+
+    throw new Error(
+      "PAYOUT_ALREADY_REJECTED"
+    );
+  }
+
+  const wallet =
+    String(
+      payout.wallet_address ||
+      payout.wallet ||
+      ""
+    ).trim();
+
+  if (
+    !ethers.isAddress(
+      wallet
+    )
+  ) {
+
+    throw new Error(
+      "INVALID_BSC_WALLET"
+    );
+  }
+
+  const amount =
+    Number(
+      payout.amount
+    );
+
+  if (
+    !Number.isInteger(
+      amount
+    ) ||
+    amount <= 0
+  ) {
+
+    throw new Error(
+      "INVALID_PAYOUT_AMOUNT"
+    );
+  }
+
+  const usdtAmount =
+    amount /
+    GALAXY_PER_USDT;
+
+  const tokenAmount =
+    ethers.parseUnits(
+      usdtAmount.toFixed(
+        USDT_DECIMALS
+      ),
+      USDT_DECIMALS
+    );
+
+  console.log(
+    `💸 Auto payout ${payoutId}: ${usdtAmount} USDT → ${wallet}`
+  );
+
+  // Check payout wallet USDT balance
+
+  const payoutBalance =
+    await usdtContract.balanceOf(
+      payoutWallet.address
+    );
+
+  if (
+    payoutBalance <
+    tokenAmount
+  ) {
+
+    throw new Error(
+      "INSUFFICIENT_PAYOUT_USDT_BALANCE"
+    );
+  }
+
+  // Check BNB balance for gas
+
+  const bnbBalance =
+    await bscProvider.getBalance(
+      payoutWallet.address
+    );
+
+  if (
+    bnbBalance <= 0n
+  ) {
+
+    throw new Error(
+      "INSUFFICIENT_BNB_FOR_GAS"
+    );
+  }
+
+  // Mark as processing
+
+  try {
+
+    await supabaseRequest(
+      `/rest/v1/payouts?id=eq.${encodeURIComponent(
+        payoutId
+      )}`,
+      {
+        method:
+          "PATCH",
+
+        body:
+          JSON.stringify({
+            status:
+              "processing"
+          })
+      }
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "⚠️ Could not mark payout processing:",
+      error?.message ||
+      error
+    );
+  }
+
+  // Send USDT
+
+  const tx =
+    await usdtContract.transfer(
+      wallet,
+      tokenAmount
+    );
+
+  console.log(
+    `📤 BSC transaction sent: ${tx.hash}`
+  );
+
+  // Wait for blockchain confirmation
+
+  const receipt =
+    await tx.wait();
+
+  if (
+    !receipt ||
+    receipt.status !== 1
+  ) {
+
+    throw new Error(
+      "BLOCKCHAIN_TRANSACTION_FAILED"
+    );
+  }
+
+  console.log(
+    `✅ BSC transaction confirmed: ${tx.hash}`
+  );
+
+  // Update payout as paid
+
+  await supabaseRequest(
+    `/rest/v1/payouts?id=eq.${encodeURIComponent(
+      payoutId
+    )}`,
+    {
+      method:
+        "PATCH",
+
+      body:
+        JSON.stringify({
+          status:
+            "paid",
+
+          tx_hash:
+            tx.hash,
+
+          processed_at:
+            new Date().toISOString()
+        })
+    }
+  );
+
+  const updatedPayout =
+    {
+      ...payout,
+
+      status:
+        "paid",
+
+      tx_hash:
+        tx.hash,
+
+      processed_at:
+        new Date().toISOString()
+    };
+
+  // Payment channel notification
+
+  await sendPaymentChannelMessage(
+    updatedPayout
+  );
+
+  return {
+
+    success:
+      true,
+
+    alreadyPaid:
+      false,
+
+    txHash:
+      tx.hash,
+
+    usdtAmount,
+
+    payout:
+      updatedPayout
+  };
 }
 
 // ==================================================
@@ -631,10 +1221,16 @@ const server =
       );
 
       if (
-        req.method === "OPTIONS"
+        req.method ===
+        "OPTIONS"
       ) {
-        res.writeHead(204);
+
+        res.writeHead(
+          204
+        );
+
         res.end();
+
         return;
       }
 
@@ -651,12 +1247,22 @@ const server =
             req.url === "/health"
           )
         ) {
+
           sendJson(
             res,
             200,
             {
-              status: "ok",
-              app: "Galaxy Token"
+              status:
+                "ok",
+
+              app:
+                "Galaxy Token",
+
+              autoPayout:
+                !!(
+                  payoutWallet &&
+                  usdtContract
+                )
             }
           );
 
@@ -674,11 +1280,16 @@ const server =
         ) {
 
           const body =
-            await readBody(req);
+            await readBody(
+              req
+            );
 
           try {
+
             const update =
-              JSON.parse(body);
+              JSON.parse(
+                body
+              );
 
             if (
               update.message &&
@@ -687,12 +1298,14 @@ const server =
                 "/start"
               )
             ) {
+
               await handleStart(
                 update.message
               );
             }
 
           } catch (error) {
+
             console.error(
               "❌ Webhook processing error:",
               error
@@ -703,7 +1316,8 @@ const server =
             res,
             200,
             {
-              ok: true
+              ok:
+                true
             }
           );
 
@@ -721,19 +1335,28 @@ const server =
         ) {
 
           const body =
-            await readBody(req);
+            await readBody(
+              req
+            );
 
           let parsed;
 
           try {
+
             parsed =
-              JSON.parse(body);
+              JSON.parse(
+                body
+              );
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -743,14 +1366,19 @@ const server =
           }
 
           const telegramUser =
-            authenticate(parsed);
+            authenticate(
+              parsed
+            );
 
           if (!telegramUser) {
+
             sendJson(
               res,
               401,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TELEGRAM_SESSION"
               }
@@ -766,16 +1394,12 @@ const server =
               )
             );
 
-          /*
-           * Both formats are returned so the
-           * current Mini App works correctly.
-           */
-
           sendJson(
             res,
             200,
             {
-              success: true,
+              success:
+                true,
 
               joined:
                 result.joined,
@@ -823,19 +1447,28 @@ const server =
         ) {
 
           const body =
-            await readBody(req);
+            await readBody(
+              req
+            );
 
           let parsed;
 
           try {
+
             parsed =
-              JSON.parse(body);
+              JSON.parse(
+                body
+              );
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -845,14 +1478,19 @@ const server =
           }
 
           const telegramUser =
-            authenticate(parsed);
+            authenticate(
+              parsed
+            );
 
           if (!telegramUser) {
+
             sendJson(
               res,
               401,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TELEGRAM_SESSION"
               }
@@ -872,12 +1510,11 @@ const server =
             );
 
           if (!user) {
+
             throw new Error(
               "USER_NOT_FOUND"
             );
           }
-
-          // Get task claims
 
           const claims =
             await supabaseRequest(
@@ -894,7 +1531,9 @@ const server =
               task => {
 
                 const claim =
-                  Array.isArray(claims)
+                  Array.isArray(
+                    claims
+                  )
                     ? claims.find(
                         x =>
                           x.task_id ===
@@ -902,7 +1541,8 @@ const server =
                       )
                     : null;
 
-                let available = true;
+                let available =
+                  true;
 
                 let nextAvailableAt =
                   null;
@@ -928,7 +1568,8 @@ const server =
                     nextTime
                   ) {
 
-                    available = false;
+                    available =
+                      false;
 
                     nextAvailableAt =
                       new Date(
@@ -946,6 +1587,7 @@ const server =
                 }
 
                 return {
+
                   id:
                     task.id,
 
@@ -982,12 +1624,8 @@ const server =
             res,
             200,
             {
-              success: true,
-
-              /*
-               * Current frontend can use either
-               * result.balance or result.user.balance.
-               */
+              success:
+                true,
 
               balance,
 
@@ -1034,7 +1672,7 @@ const server =
         }
 
         // ==================================================
-        // EARN YOUTUBE TASK
+        // EARN
         // ==================================================
 
         if (
@@ -1043,19 +1681,28 @@ const server =
         ) {
 
           const body =
-            await readBody(req);
+            await readBody(
+              req
+            );
 
           let parsed;
 
           try {
+
             parsed =
-              JSON.parse(body);
+              JSON.parse(
+                body
+              );
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -1065,14 +1712,19 @@ const server =
           }
 
           const telegramUser =
-            authenticate(parsed);
+            authenticate(
+              parsed
+            );
 
           if (!telegramUser) {
+
             sendJson(
               res,
               401,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TELEGRAM_SESSION"
               }
@@ -1089,11 +1741,14 @@ const server =
             );
 
           if (!task) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TASK"
               }
@@ -1106,8 +1761,6 @@ const server =
             String(
               telegramUser.id
             );
-
-          // Check both channels
 
           const channels =
             await verifyChannels(
@@ -1122,9 +1775,11 @@ const server =
               res,
               403,
               {
-                success: false,
+                success:
+                  false,
 
-                ok: false,
+                ok:
+                  false,
 
                 error:
                   "CHANNEL_JOIN_REQUIRED",
@@ -1144,13 +1799,12 @@ const server =
             chatId
           );
 
-          // Atomic SQL claim
-
           const result =
             await supabaseRequest(
               "/rest/v1/rpc/claim_youtube_task",
               {
-                method: "POST",
+                method:
+                  "POST",
 
                 body:
                   JSON.stringify({
@@ -1167,22 +1821,27 @@ const server =
             );
 
           const claimResult =
-            Array.isArray(result)
+            Array.isArray(
+              result
+            )
               ? result[0]
               : result;
 
           if (
             !claimResult ||
-            claimResult.success !== true
+            claimResult.success !==
+              true
           ) {
 
             sendJson(
               res,
               429,
               {
-                success: false,
+                success:
+                  false,
 
-                ok: false,
+                ok:
+                  false,
 
                 error:
                   "TASK_COOLDOWN",
@@ -1207,7 +1866,8 @@ const server =
 
           const newBalance =
             Number(
-              claimResult.balance || 0
+              claimResult.balance ||
+              0
             );
 
           console.log(
@@ -1218,9 +1878,11 @@ const server =
             res,
             200,
             {
-              success: true,
+              success:
+                true,
 
-              ok: true,
+              ok:
+                true,
 
               balance:
                 newBalance,
@@ -1245,7 +1907,7 @@ const server =
         }
 
         // ==================================================
-        // CREATE PAYOUT
+        // CREATE + AUTO PAYOUT
         // ==================================================
 
         if (
@@ -1254,19 +1916,28 @@ const server =
         ) {
 
           const body =
-            await readBody(req);
+            await readBody(
+              req
+            );
 
           let parsed;
 
           try {
+
             parsed =
-              JSON.parse(body);
+              JSON.parse(
+                body
+              );
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -1276,14 +1947,19 @@ const server =
           }
 
           const telegramUser =
-            authenticate(parsed);
+            authenticate(
+              parsed
+            );
 
           if (!telegramUser) {
+
             sendJson(
               res,
               401,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TELEGRAM_SESSION"
               }
@@ -1299,7 +1975,8 @@ const server =
 
           const wallet =
             String(
-              parsed.wallet || ""
+              parsed.wallet ||
+              ""
             ).trim();
 
           if (
@@ -1307,12 +1984,17 @@ const server =
               amount
             )
           ) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
-                ok: false,
+                success:
+                  false,
+
+                ok:
+                  false,
+
                 error:
                   "INVALID_AMOUNT"
               }
@@ -1325,12 +2007,16 @@ const server =
             amount <
             MIN_WITHDRAWAL
           ) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
-                ok: false,
+                success:
+                  false,
+
+                ok:
+                  false,
 
                 error:
                   "MIN_WITHDRAWAL",
@@ -1347,15 +2033,25 @@ const server =
             return;
           }
 
-          if (!wallet) {
+          if (
+            !wallet ||
+            !ethers.isAddress(
+              wallet
+            )
+          ) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
-                ok: false,
+                success:
+                  false,
+
+                ok:
+                  false,
+
                 error:
-                  "WALLET_REQUIRED"
+                  "INVALID_WALLET"
               }
             );
 
@@ -1363,17 +2059,25 @@ const server =
           }
 
           if (
-            wallet.length < 10 ||
-            wallet.length > 150
+            !payoutWallet ||
+            !usdtContract
           ) {
+
             sendJson(
               res,
-              400,
+              503,
               {
-                success: false,
-                ok: false,
+                success:
+                  false,
+
+                ok:
+                  false,
+
                 error:
-                  "INVALID_WALLET"
+                  "AUTO_PAYOUT_NOT_CONFIGURED",
+
+                message:
+                  "Auto payout wallet is not configured."
               }
             );
 
@@ -1385,11 +2089,14 @@ const server =
               telegramUser.id
             );
 
+          // Create payout and deduct balance
+
           const result =
             await supabaseRequest(
               "/rest/v1/rpc/create_manual_payout",
               {
-                method: "POST",
+                method:
+                  "POST",
 
                 body:
                   JSON.stringify({
@@ -1406,21 +2113,27 @@ const server =
             );
 
           const payout =
-            Array.isArray(result)
+            Array.isArray(
+              result
+            )
               ? result[0]
               : result;
 
           if (
             !payout ||
-            payout.success !== true
+            payout.success !==
+              true
           ) {
 
             sendJson(
               res,
               400,
               {
-                success: false,
-                ok: false,
+                success:
+                  false,
+
+                ok:
+                  false,
 
                 error:
                   payout?.error ||
@@ -1431,37 +2144,112 @@ const server =
             return;
           }
 
-          sendJson(
-            res,
-            200,
-            {
-              success: true,
-              ok: true,
-
-              payoutId:
-                payout.payout_id,
-
-              balance:
-                Number(
-                  payout.balance || 0
-                ),
-
-              amount,
-
-              usdt:
-                amount /
-                GALAXY_PER_USDT,
-
-              status:
-                "pending"
-            }
-          );
+          const payoutId =
+            payout.payout_id;
 
           console.log(
-            `💸 Withdrawal created: ${chatId} | ${amount} GALAXY | ${wallet}`
+            `💸 Withdrawal created: ${chatId} | ${amount} GALAXY | ${wallet} | ID ${payoutId}`
           );
 
-          return;
+          // Auto send USDT
+
+          try {
+
+            const autoResult =
+              await processAutoPayout(
+                payoutId
+              );
+
+            const newBalance =
+              Number(
+                payout.balance ||
+                0
+              );
+
+            sendJson(
+              res,
+              200,
+              {
+                success:
+                  true,
+
+                ok:
+                  true,
+
+                payoutId,
+
+                balance:
+                  newBalance,
+
+                amount,
+
+                usdt:
+                  amount /
+                  GALAXY_PER_USDT,
+
+                status:
+                  "paid",
+
+                txHash:
+                  autoResult.txHash,
+
+                usdtAmount:
+                  autoResult.usdtAmount ||
+                  (
+                    amount /
+                    GALAXY_PER_USDT
+                  )
+              }
+            );
+
+            return;
+
+          } catch (autoError) {
+
+            console.error(
+              "❌ AUTO PAYOUT FAILED:",
+              autoError?.stack ||
+              autoError
+            );
+
+            // Keep payout pending for safety.
+            // Balance is already reserved/deducted
+            // by create_manual_payout.
+
+            sendJson(
+              res,
+              200,
+              {
+                success:
+                  true,
+
+                ok:
+                  true,
+
+                payoutId,
+
+                balance:
+                  Number(
+                    payout.balance ||
+                    0
+                  ),
+
+                amount,
+
+                usdt:
+                  amount /
+                  GALAXY_PER_USDT,
+
+                status:
+                  "pending",
+
+                message:
+                  "Withdrawal created but automatic payment could not be completed. It remains pending."
+              }
+            );
+
+            return;
+          }
         }
 
         // ==================================================
@@ -1474,19 +2262,28 @@ const server =
         ) {
 
           const body =
-            await readBody(req);
+            await readBody(
+              req
+            );
 
           let parsed;
 
           try {
+
             parsed =
-              JSON.parse(body);
+              JSON.parse(
+                body
+              );
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -1496,14 +2293,19 @@ const server =
           }
 
           const telegramUser =
-            authenticate(parsed);
+            authenticate(
+              parsed
+            );
 
           if (!telegramUser) {
+
             sendJson(
               res,
               401,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_TELEGRAM_SESSION"
               }
@@ -1521,25 +2323,29 @@ const server =
             await supabaseRequest(
               `/rest/v1/payouts?chat_id=eq.${encodeURIComponent(
                 chatId
-              )}&select=id,amount,wallet_address,status,tx_hash,created_at,processed_at&order=created_at.desc&limit=50`
+              )}&select=id,chat_id,amount,wallet_address,status,tx_hash,created_at,processed_at&order=created_at.desc&limit=50`
             );
 
           const output =
             (
-              payouts || []
+              payouts ||
+              []
             ).map(
               p => ({
+
                 id:
                   p.id,
 
                 amount:
                   Number(
-                    p.amount || 0
+                    p.amount ||
+                    0
                   ),
 
                 usdt:
                   Number(
-                    p.amount || 0
+                    p.amount ||
+                    0
                   ) /
                   GALAXY_PER_USDT,
 
@@ -1572,8 +2378,11 @@ const server =
             res,
             200,
             {
-              success: true,
-              ok: true,
+              success:
+                true,
+
+              ok:
+                true,
 
               payouts:
                 output
@@ -1589,15 +2398,19 @@ const server =
 
         if (
           req.method === "POST" &&
-          req.url === "/admin/payout"
+          req.url ===
+            "/admin/payout"
         ) {
 
           if (!ADMIN_SECRET) {
+
             sendJson(
               res,
               503,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "ADMIN_SECRET_NOT_CONFIGURED"
               }
@@ -1607,19 +2420,28 @@ const server =
           }
 
           const body =
-            await readBody(req);
+            await readBody(
+              req
+            );
 
           let parsed;
 
           try {
+
             parsed =
-              JSON.parse(body);
+              JSON.parse(
+                body
+              );
+
           } catch {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_JSON"
               }
@@ -1632,11 +2454,14 @@ const server =
             parsed.adminSecret !==
             ADMIN_SECRET
           ) {
+
             sendJson(
               res,
               403,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_ADMIN_SECRET"
               }
@@ -1647,12 +2472,14 @@ const server =
 
           const payoutId =
             String(
-              parsed.payoutId || ""
+              parsed.payoutId ||
+              ""
             ).trim();
 
           const action =
             String(
-              parsed.action || ""
+              parsed.action ||
+              ""
             ).toLowerCase();
 
           if (
@@ -1660,13 +2487,18 @@ const server =
             ![
               "paid",
               "rejected"
-            ].includes(action)
+            ].includes(
+              action
+            )
           ) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
+
                 error:
                   "INVALID_PAYOUT_ACTION"
               }
@@ -1679,7 +2511,8 @@ const server =
             await supabaseRequest(
               "/rest/v1/rpc/update_payout_status",
               {
-                method: "POST",
+                method:
+                  "POST",
 
                 body:
                   JSON.stringify({
@@ -1693,19 +2526,24 @@ const server =
             );
 
           const output =
-            Array.isArray(result)
+            Array.isArray(
+              result
+            )
               ? result[0]
               : result;
 
           if (
             !output ||
-            output.success !== true
+            output.success !==
+              true
           ) {
+
             sendJson(
               res,
               400,
               {
-                success: false,
+                success:
+                  false,
 
                 error:
                   output?.error ||
@@ -1720,8 +2558,11 @@ const server =
             res,
             200,
             {
-              success: true,
-              ok: true,
+              success:
+                true,
+
+              ok:
+                true,
 
               payoutId,
 
@@ -1749,7 +2590,9 @@ const server =
           res,
           404,
           {
-            success: false,
+            success:
+              false,
+
             error:
               "NOT_FOUND"
           }
@@ -1767,8 +2610,12 @@ const server =
           res,
           500,
           {
-            success: false,
-            ok: false,
+            success:
+              false,
+
+            ok:
+              false,
+
             error:
               "SERVER_ERROR"
           }
@@ -1795,15 +2642,11 @@ server.listen(
 
     try {
 
-      // Remove old webhook
-
       await bot.deleteWebHook();
 
       console.log(
         "🧹 Old webhook removed"
       );
-
-      // Set new webhook
 
       const webhookUrl =
         `${BACKEND_URL}/bot${BOT_TOKEN}`;
@@ -1852,8 +2695,6 @@ server.listen(
         );
       }
 
-      // Verify bot
-
       try {
 
         const botInfo =
@@ -1871,6 +2712,35 @@ server.listen(
           "⚠️ getMe failed:",
           error?.message ||
           error
+        );
+      }
+
+      // ==================================================
+      // AUTO PAYOUT STATUS
+      // ==================================================
+
+      if (
+        payoutWallet &&
+        usdtContract
+      ) {
+
+        console.log(
+          "🟢 AUTO PAYOUT: ENABLED"
+        );
+
+        console.log(
+          "💰 Payout wallet:",
+          payoutWallet.address
+        );
+
+      } else {
+
+        console.log(
+          "🔴 AUTO PAYOUT: DISABLED"
+        );
+
+        console.log(
+          "⚠️ Add PAYOUT_PRIVATE_KEY and PAYOUT_WALLET in Railway Variables."
         );
       }
 
@@ -1913,7 +2783,7 @@ server.listen(
     } catch (error) {
 
       console.error(
-        "❌ Webhook setup error:",
+        "❌ Startup error:",
         error?.stack ||
         error
       );
@@ -1935,11 +2805,14 @@ process.on(
 
     server.close(
       () => {
+
         console.log(
           "✅ Server closed"
         );
 
-        process.exit(0);
+        process.exit(
+          0
+        );
       }
     );
   }
@@ -1955,11 +2828,14 @@ process.on(
 
     server.close(
       () => {
+
         console.log(
           "✅ Server closed"
         );
 
-        process.exit(0);
+        process.exit(
+          0
+        );
       }
     );
   }
