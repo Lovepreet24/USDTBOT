@@ -36,24 +36,51 @@ const CONFIG = {
   // INTERNAL ONLY
   NX_PER_USDT: 10000,
 
+  // =======================================================
+  // ALL 5 TASKS
+  // =======================================================
+
   TASKS: [
     {
       id: 1,
+      type: "youtube",
       title: "Watch YouTube Video",
       reward: 50,
       url: "https://youtu.be/unTAEBvggus"
     },
+
     {
       id: 2,
+      type: "youtube",
       title: "Watch YouTube Video",
       reward: 50,
       url: "https://youtu.be/Hja_iwEkfmI"
     },
+
     {
       id: 3,
+      type: "youtube",
       title: "Watch YouTube Video",
       reward: 50,
       url: "https://youtu.be/I5mLBbsuAdA"
+    },
+
+    {
+      id: 4,
+      type: "telegram",
+      title: "Join NX Coin Official",
+      reward: 50,
+      channel: "@NXCoinOfficial",
+      url: "https://t.me/NXCoinOfficial"
+    },
+
+    {
+      id: 5,
+      type: "telegram",
+      title: "Join NX Coin Payments",
+      reward: 50,
+      channel: "@NXCoinPayments",
+      url: "https://t.me/NXCoinPayments"
     }
   ],
 
@@ -129,10 +156,10 @@ async function supabaseRequest(
         ...options,
 
         headers: {
-          "apikey":
+          apikey:
             SUPABASE_SERVICE_ROLE_KEY,
 
-          "Authorization":
+          Authorization:
             `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
 
           "Content-Type":
@@ -233,10 +260,10 @@ async function registerUser(
         p_chat_id:
           Number(chatId),
 
+        // Referral is processed separately.
+        // This prevents double rewards.
         p_referrer_id:
-          referrerId
-            ? Number(referrerId)
-            : null,
+          null,
 
         p_username:
           username,
@@ -246,6 +273,53 @@ async function registerUser(
       })
     }
   );
+}
+
+// =========================================================
+// PROCESS REFERRAL
+// =========================================================
+
+async function processReferral(
+  referrerId,
+  referredId
+) {
+  if (
+    !referrerId ||
+    !referredId
+  ) {
+    return null;
+  }
+
+  if (
+    Number(referrerId) ===
+    Number(referredId)
+  ) {
+    return null;
+  }
+
+  try {
+    return await supabaseRequest(
+      `/rest/v1/rpc/process_referral`,
+      {
+        method: "POST",
+
+        body: JSON.stringify({
+          p_referrer_id:
+            Number(referrerId),
+
+          p_referred_id:
+            Number(referredId)
+        })
+      }
+    );
+  } catch (error) {
+    console.error(
+      "Referral processing error:",
+      error.message
+    );
+
+    return null;
+  }
 }
 
 // =========================================================
@@ -264,7 +338,7 @@ async function ensureUser(
   if (!user) {
     await registerUser(
       chatId,
-      referrerId,
+      null,
       username,
       firstName
     );
@@ -276,6 +350,22 @@ async function ensureUser(
       chatId,
       username,
       firstName
+    );
+
+    user =
+      await getUser(chatId);
+  }
+
+  // Process referral independently.
+  // No channel verification required.
+  if (
+    referrerId &&
+    Number(referrerId) !==
+      Number(chatId)
+  ) {
+    await processReferral(
+      referrerId,
+      chatId
     );
 
     user =
@@ -448,13 +538,29 @@ async function isMemberOfChannel(
         chatId
       );
 
-    return [
-      "creator",
-      "administrator",
-      "member"
-    ].includes(
-      member.status
-    );
+    if (
+      [
+        "creator",
+        "administrator",
+        "member"
+      ].includes(
+        member.status
+      )
+    ) {
+      return true;
+    }
+
+    // Telegram can return restricted
+    // members with is_member=true.
+    if (
+      member.status ===
+        "restricted" &&
+      member.is_member === true
+    ) {
+      return true;
+    }
+
+    return false;
 
   } catch (error) {
     console.error(
@@ -468,6 +574,7 @@ async function isMemberOfChannel(
 
 // =========================================================
 // VERIFY BOTH CHANNELS
+// LEGACY ENDPOINT
 // =========================================================
 
 async function verifyChannels(
@@ -516,8 +623,21 @@ async function verifyChannels(
 }
 
 // =========================================================
+// VERIFY SPECIFIC TASK CHANNEL
+// =========================================================
+
+async function verifyTaskChannel(
+  chatId,
+  channel
+) {
+  return await isMemberOfChannel(
+    chatId,
+    channel
+  );
+}
+
+// =========================================================
 // /START COMMAND
-// ONLY OPEN NX COIN BUTTON
 // =========================================================
 
 bot.onText(
@@ -606,24 +726,13 @@ Complete tasks, invite friends and earn more NX Coins.`,
 );
 
 // =========================================================
-// CLAIM TASK
+// CLAIM YOUTUBE TASK
 // =========================================================
 
-async function claimTask(
+async function claimYoutubeTask(
   chatId,
-  taskId
+  task
 ) {
-  const task =
-    CONFIG.TASKS.find(
-      x => x.id === taskId
-    );
-
-  if (!task) {
-    throw new Error(
-      "Task not found"
-    );
-  }
-
   return await supabaseRequest(
     `/rest/v1/rpc/claim_youtube_task`,
     {
@@ -634,12 +743,103 @@ async function claimTask(
           Number(chatId),
 
         p_task_id:
-          Number(taskId),
+          Number(task.id),
 
         p_reward:
           Number(task.reward)
       })
     }
+  );
+}
+
+// =========================================================
+// CLAIM TELEGRAM TASK
+// =========================================================
+
+async function claimTelegramTask(
+  chatId,
+  task
+) {
+  if (
+    task.type !==
+    "telegram"
+  ) {
+    throw new Error(
+      "Invalid Telegram task"
+    );
+  }
+
+  const isMember =
+    await verifyTaskChannel(
+      chatId,
+      task.channel
+    );
+
+  if (!isMember) {
+    return {
+      success: false,
+
+      reason:
+        "CHANNEL_NOT_JOINED",
+
+      channel:
+        task.channel
+    };
+  }
+
+  return await supabaseRequest(
+    `/rest/v1/rpc/claim_telegram_task`,
+    {
+      method: "POST",
+
+      body: JSON.stringify({
+        p_chat_id:
+          Number(chatId),
+
+        p_task_id:
+          Number(task.id),
+
+        p_reward:
+          Number(task.reward)
+      })
+    }
+  );
+}
+
+// =========================================================
+// CLAIM ANY TASK
+// =========================================================
+
+async function claimTask(
+  chatId,
+  taskId
+) {
+  const task =
+    CONFIG.TASKS.find(
+      x =>
+        x.id ===
+        taskId
+    );
+
+  if (!task) {
+    throw new Error(
+      "Task not found"
+    );
+  }
+
+  if (
+    task.type ===
+    "telegram"
+  ) {
+    return await claimTelegramTask(
+      chatId,
+      task
+    );
+  }
+
+  return await claimYoutubeTask(
+    chatId,
+    task
   );
 }
 
@@ -845,6 +1045,7 @@ async function processAutoPayout(
       );
     } catch {}
 
+    // ONLY FINAL PAYMENT MESSAGE
     try {
       await bot.sendMessage(
         CONFIG.PAYMENT_CHANNEL,
@@ -1072,6 +1273,7 @@ const server =
 
         // -------------------------------------------------
         // VERIFY CHANNELS
+        // LEGACY ENDPOINT
         // -------------------------------------------------
 
         if (
@@ -1185,6 +1387,9 @@ const server =
                     id:
                       task.id,
 
+                    type:
+                      task.type,
+
                     title:
                       task.title,
 
@@ -1192,7 +1397,11 @@ const server =
                       task.reward,
 
                     url:
-                      task.url
+                      task.url,
+
+                    channel:
+                      task.channel ||
+                      null
                   })
                 ),
 
@@ -1271,33 +1480,67 @@ const server =
             return;
           }
 
-          const channelStatus =
-            await verifyChannels(
-              telegramUser.id
+          const task =
+            CONFIG.TASKS.find(
+              x =>
+                x.id ===
+                taskId
             );
 
-          if (
-            !channelStatus.verified
-          ) {
+          if (!task) {
             sendJson(
               res,
-              403,
+              404,
               {
                 ok: false,
 
                 error:
-                  "CHANNELS_NOT_VERIFIED",
-
-                mainChannel:
-                  channelStatus.mainChannel,
-
-                paymentChannel:
-                  channelStatus.paymentChannel
+                  "TASK_NOT_FOUND"
               }
             );
 
             return;
           }
+
+          // =================================================
+          // TELEGRAM TASK
+          // =================================================
+
+          if (
+            task.type ===
+            "telegram"
+          ) {
+            const isMember =
+              await verifyTaskChannel(
+                telegramUser.id,
+                task.channel
+              );
+
+            if (!isMember) {
+              sendJson(
+                res,
+                403,
+                {
+                  ok: false,
+
+                  error:
+                    "CHANNEL_NOT_JOINED",
+
+                  channel:
+                    task.channel,
+
+                  message:
+                    `Please join ${task.channel} first.`
+                }
+              );
+
+              return;
+            }
+          }
+
+          // =================================================
+          // CLAIM TASK
+          // =================================================
 
           const result =
             await claimTask(
@@ -1331,13 +1574,17 @@ const server =
               reward:
                 Number(
                   result.reward ||
-                  CONFIG.TASK_REWARD
+                  task.reward
                 ),
 
               balance:
                 Number(
-                  user.balance
-                )
+                  user.balance || 0
+                ),
+
+              nextClaimAt:
+                result.next_claim_at ||
+                null
             }
           );
 
@@ -1715,10 +1962,11 @@ server.listen(
       `Payment channel: ${CONFIG.PAYMENT_CHANNEL}`
     );
 
-    // Bot name is already set in Telegram.
-    // setMyName() intentionally removed.
+    console.log(
+      "Total tasks:",
+      CONFIG.TASKS.length
+    );
 
-    // Webhook is configured independently.
     try {
       const webhookUrl =
         `${CONFIG.BACKEND_URL}/bot${BOT_TOKEN}`;
