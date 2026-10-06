@@ -34,7 +34,6 @@ const CONFIG = {
   TASK_COOLDOWN_HOURS: 24,
 
   // INTERNAL ONLY
-  // User ko app me USDT/value show nahi karna.
   NX_PER_USDT: 10000,
 
   TASKS: [
@@ -69,10 +68,11 @@ const CONFIG = {
 };
 
 // =========================================================
-// ENV
+// ENVIRONMENT VARIABLES
 // =========================================================
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
+const BOT_TOKEN =
+  process.env.BOT_TOKEN;
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL;
@@ -90,7 +90,7 @@ const PAYOUT_WALLET =
   process.env.PAYOUT_WALLET;
 
 // =========================================================
-// BASIC VALIDATION
+// VALIDATION
 // =========================================================
 
 if (!BOT_TOKEN) {
@@ -102,36 +102,56 @@ if (!SUPABASE_URL) {
 }
 
 if (!SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("SUPABASE_SERVICE_ROLE_KEY missing");
+  throw new Error(
+    "SUPABASE_SERVICE_ROLE_KEY missing"
+  );
 }
 
-const bot = new TelegramBot(BOT_TOKEN);
-
 // =========================================================
-// SUPABASE HELPERS
+// TELEGRAM BOT
 // =========================================================
 
-async function supabaseRequest(path, options = {}) {
-  const response = await fetch(
-    `${SUPABASE_URL}${path}`,
-    {
-      ...options,
-      headers: {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization":
-          `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "Content-Type": "application/json",
-        ...(options.headers || {})
+const bot =
+  new TelegramBot(BOT_TOKEN);
+
+// =========================================================
+// SUPABASE REQUEST
+// =========================================================
+
+async function supabaseRequest(
+  path,
+  options = {}
+) {
+  const response =
+    await fetch(
+      `${SUPABASE_URL}${path}`,
+      {
+        ...options,
+
+        headers: {
+          "apikey":
+            SUPABASE_SERVICE_ROLE_KEY,
+
+          "Authorization":
+            `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+
+          "Content-Type":
+            "application/json",
+
+          ...(options.headers || {})
+        }
       }
-    }
-  );
+    );
 
-  const text = await response.text();
+  const text =
+    await response.text();
 
   let data;
 
   try {
-    data = text ? JSON.parse(text) : null;
+    data = text
+      ? JSON.parse(text)
+      : null;
   } catch {
     data = text;
   }
@@ -150,18 +170,23 @@ async function supabaseRequest(path, options = {}) {
 }
 
 // =========================================================
-// USER HELPERS
+// GET USER
 // =========================================================
 
 async function getUser(chatId) {
-  const data = await supabaseRequest(
-    `/rest/v1/users?chat_id=eq.${encodeURIComponent(
-      chatId
-    )}&select=*`
-  );
+  const data =
+    await supabaseRequest(
+      `/rest/v1/users?chat_id=eq.${encodeURIComponent(
+        chatId
+      )}&select=*`
+    );
 
   return data?.[0] || null;
 }
+
+// =========================================================
+// UPDATE USER PROFILE
+// =========================================================
 
 async function updateUserProfile(
   chatId,
@@ -174,20 +199,24 @@ async function updateUserProfile(
     )}`,
     {
       method: "PATCH",
+
       body: JSON.stringify({
         username:
-          username === undefined
-            ? null
-            : username,
+          username ?? null,
+
         first_name:
-          firstName === undefined
-            ? null
-            : firstName,
-        updated_at: new Date().toISOString()
+          firstName ?? null,
+
+        updated_at:
+          new Date().toISOString()
       })
     }
   );
 }
+
+// =========================================================
+// REGISTER USER
+// =========================================================
 
 async function registerUser(
   chatId,
@@ -199,18 +228,29 @@ async function registerUser(
     `/rest/v1/rpc/register_user`,
     {
       method: "POST",
+
       body: JSON.stringify({
-        p_chat_id: Number(chatId),
+        p_chat_id:
+          Number(chatId),
+
         p_referrer_id:
           referrerId
             ? Number(referrerId)
             : null,
-        p_username: username,
-        p_first_name: firstName
+
+        p_username:
+          username,
+
+        p_first_name:
+          firstName
       })
     }
   );
 }
+
+// =========================================================
+// ENSURE USER
+// =========================================================
 
 async function ensureUser(
   chatId,
@@ -218,7 +258,8 @@ async function ensureUser(
   username = null,
   firstName = null
 ) {
-  let user = await getUser(chatId);
+  let user =
+    await getUser(chatId);
 
   if (!user) {
     await registerUser(
@@ -228,7 +269,8 @@ async function ensureUser(
       firstName
     );
 
-    user = await getUser(chatId);
+    user =
+      await getUser(chatId);
   } else {
     await updateUserProfile(
       chatId,
@@ -236,25 +278,35 @@ async function ensureUser(
       firstName
     );
 
-    user = await getUser(chatId);
+    user =
+      await getUser(chatId);
   }
 
   return user;
 }
 
 // =========================================================
-// TELEGRAM INIT DATA VALIDATION
+// TELEGRAM MINI APP INIT DATA VALIDATION
 // =========================================================
 
-function validateTelegramInitData(initData) {
-  if (!initData || !BOT_TOKEN) {
+function validateTelegramInitData(
+  initData
+) {
+  if (
+    !initData ||
+    !BOT_TOKEN
+  ) {
     return null;
   }
 
   try {
-    const params = new URLSearchParams(initData);
+    const params =
+      new URLSearchParams(
+        initData
+      );
 
-    const hash = params.get("hash");
+    const hash =
+      params.get("hash");
 
     if (!hash) {
       return null;
@@ -262,31 +314,37 @@ function validateTelegramInitData(initData) {
 
     params.delete("hash");
 
-    const dataCheckString = [...params.entries()]
-      .sort(([a], [b]) =>
-        a.localeCompare(b)
-      )
-      .map(
-        ([key, value]) =>
-          `${key}=${value}`
-      )
-      .join("\n");
+    const dataCheckString =
+      [...params.entries()]
+        .sort(
+          ([a], [b]) =>
+            a.localeCompare(b)
+        )
+        .map(
+          ([key, value]) =>
+            `${key}=${value}`
+        )
+        .join("\n");
 
-    const secretKey = crypto
-      .createHmac(
-        "sha256",
-        "WebAppData"
-      )
-      .update(BOT_TOKEN)
-      .digest();
+    const secretKey =
+      crypto
+        .createHmac(
+          "sha256",
+          "WebAppData"
+        )
+        .update(BOT_TOKEN)
+        .digest();
 
-    const calculatedHash = crypto
-      .createHmac(
-        "sha256",
-        secretKey
-      )
-      .update(dataCheckString)
-      .digest("hex");
+    const calculatedHash =
+      crypto
+        .createHmac(
+          "sha256",
+          secretKey
+        )
+        .update(
+          dataCheckString
+        )
+        .digest("hex");
 
     if (
       calculatedHash.length !==
@@ -297,7 +355,9 @@ function validateTelegramInitData(initData) {
 
     if (
       !crypto.timingSafeEqual(
-        Buffer.from(calculatedHash),
+        Buffer.from(
+          calculatedHash
+        ),
         Buffer.from(hash)
       )
     ) {
@@ -311,7 +371,10 @@ function validateTelegramInitData(initData) {
       return null;
     }
 
-    return JSON.parse(userJson);
+    return JSON.parse(
+      userJson
+    );
+
   } catch (error) {
     console.error(
       "initData validation error:",
@@ -323,12 +386,16 @@ function validateTelegramInitData(initData) {
 }
 
 // =========================================================
-// AUTH USER
+// AUTHENTICATED MINI APP USER
 // =========================================================
 
-async function getAuthenticatedUser(req) {
+async function getAuthenticatedUser(
+  req
+) {
   const initData =
-    req.headers["x-telegram-init-data"];
+    req.headers[
+      "x-telegram-init-data"
+    ];
 
   if (!initData) {
     throw new Error(
@@ -337,9 +404,14 @@ async function getAuthenticatedUser(req) {
   }
 
   const telegramUser =
-    validateTelegramInitData(initData);
+    validateTelegramInitData(
+      initData
+    );
 
-  if (!telegramUser?.id) {
+  if (
+    !telegramUser ||
+    !telegramUser.id
+  ) {
     throw new Error(
       "Invalid Telegram authentication"
     );
@@ -349,8 +421,10 @@ async function getAuthenticatedUser(req) {
     await ensureUser(
       telegramUser.id,
       null,
-      telegramUser.username || null,
-      telegramUser.first_name || null
+      telegramUser.username ||
+        null,
+      telegramUser.first_name ||
+        null
     );
 
   return {
@@ -360,7 +434,7 @@ async function getAuthenticatedUser(req) {
 }
 
 // =========================================================
-// TELEGRAM CHANNEL CHECK
+// CHECK CHANNEL MEMBERSHIP
 // =========================================================
 
 async function isMemberOfChannel(
@@ -378,7 +452,10 @@ async function isMemberOfChannel(
       "creator",
       "administrator",
       "member"
-    ].includes(member.status);
+    ].includes(
+      member.status
+    );
+
   } catch (error) {
     console.error(
       `Channel check failed ${channel}:`,
@@ -389,21 +466,28 @@ async function isMemberOfChannel(
   }
 }
 
-async function verifyChannels(chatId) {
-  const main =
+// =========================================================
+// VERIFY BOTH CHANNELS
+// =========================================================
+
+async function verifyChannels(
+  chatId
+) {
+  const mainChannel =
     await isMemberOfChannel(
       chatId,
       CONFIG.MAIN_CHANNEL
     );
 
-  const payment =
+  const paymentChannel =
     await isMemberOfChannel(
       chatId,
       CONFIG.PAYMENT_CHANNEL
     );
 
   const verified =
-    main && payment;
+    mainChannel &&
+    paymentChannel;
 
   await supabaseRequest(
     `/rest/v1/users?chat_id=eq.${encodeURIComponent(
@@ -411,9 +495,11 @@ async function verifyChannels(chatId) {
     )}`,
     {
       method: "PATCH",
+
       body: JSON.stringify({
         channels_verified:
           verified,
+
         updated_at:
           new Date().toISOString()
       })
@@ -422,13 +508,15 @@ async function verifyChannels(chatId) {
 
   return {
     verified,
-    mainChannel: main,
-    paymentChannel: payment
+
+    mainChannel,
+
+    paymentChannel
   };
 }
 
 // =========================================================
-// BOT /START
+// /START COMMAND
 // =========================================================
 
 bot.onText(
@@ -439,24 +527,31 @@ bot.onText(
         msg.chat.id;
 
       const username =
-        msg.from?.username || null;
+        msg.from?.username ||
+        null;
 
       const firstName =
-        msg.from?.first_name || null;
+        msg.from?.first_name ||
+        null;
 
-      let referrerId = null;
+      let referrerId =
+        null;
 
       const startParam =
         match?.[1];
 
       if (
         startParam &&
-        startParam.startsWith("ref_")
+        startParam.startsWith(
+          "ref_"
+        )
       ) {
         const id =
           startParam.slice(4);
 
-        if (/^\d+$/.test(id)) {
+        if (
+          /^\d+$/.test(id)
+        ) {
           referrerId =
             Number(id);
         }
@@ -475,30 +570,37 @@ bot.onText(
             {
               text:
                 "📢 Join Main Channel",
+
               url:
                 "https://t.me/NXCoinOfficial"
             }
           ],
+
           [
             {
               text:
                 "💳 Join Payment Channel",
+
               url:
                 "https://t.me/NXCoinPayments"
             }
           ],
+
           [
             {
               text:
                 "✅ Verify Channels",
+
               callback_data:
                 "verify_channels"
             }
           ],
+
           [
             {
               text:
                 "🚀 Open NX Coin",
+
               web_app: {
                 url:
                   CONFIG.WEB_APP_URL
@@ -510,6 +612,7 @@ bot.onText(
 
       await bot.sendMessage(
         chatId,
+
         `🪙 Welcome to ${CONFIG.APP_NAME}!
 
 🎁 You received 500 NX Coins joining bonus.
@@ -517,11 +620,13 @@ bot.onText(
 Complete tasks, invite friends and earn more NX Coins.
 
 Before earning, join both official channels and verify your membership.`,
+
         {
           reply_markup:
             keyboard
         }
       );
+
     } catch (error) {
       console.error(
         "/start error:",
@@ -532,7 +637,7 @@ Before earning, join both official channels and verify your membership.`,
 );
 
 // =========================================================
-// CALLBACKS
+// CALLBACK BUTTONS
 // =========================================================
 
 bot.on(
@@ -551,7 +656,9 @@ bot.on(
             chatId
           );
 
-        if (result.verified) {
+        if (
+          result.verified
+        ) {
           await bot.answerCallbackQuery(
             query.id,
             {
@@ -563,8 +670,10 @@ bot.on(
 
           await bot.sendMessage(
             chatId,
+
             "✅ Verification successful!\n\nYou can now open NX Coin and start earning."
           );
+
         } else {
           await bot.answerCallbackQuery(
             query.id,
@@ -576,9 +685,10 @@ bot.on(
           );
         }
       }
+
     } catch (error) {
       console.error(
-        "callback error:",
+        "Callback error:",
         error
       );
 
@@ -597,7 +707,7 @@ bot.on(
 );
 
 // =========================================================
-// EARN TASK
+// CLAIM TASK
 // =========================================================
 
 async function claimTask(
@@ -615,27 +725,27 @@ async function claimTask(
     );
   }
 
-  const result =
-    await supabaseRequest(
-      `/rest/v1/rpc/claim_youtube_task`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          p_chat_id:
-            Number(chatId),
-          p_task_id:
-            Number(taskId),
-          p_reward:
-            Number(task.reward)
-        })
-      }
-    );
+  return await supabaseRequest(
+    `/rest/v1/rpc/claim_youtube_task`,
+    {
+      method: "POST",
 
-  return result;
+      body: JSON.stringify({
+        p_chat_id:
+          Number(chatId),
+
+        p_task_id:
+          Number(taskId),
+
+        p_reward:
+          Number(task.reward)
+      })
+    }
+  );
 }
 
 // =========================================================
-// PAYOUT PROVIDER
+// ERC20 ABI
 // =========================================================
 
 const ERC20_ABI = [
@@ -643,6 +753,10 @@ const ERC20_ABI = [
   "function balanceOf(address account) view returns (uint256)",
   "function decimals() view returns (uint8)"
 ];
+
+// =========================================================
+// AUTO PAYOUT
+// =========================================================
 
 async function processAutoPayout(
   payoutId
@@ -701,7 +815,9 @@ async function processAutoPayout(
     );
 
   const amountUsdt =
-    Number(payout.amount_nx) /
+    Number(
+      payout.amount_nx
+    ) /
     CONFIG.NX_PER_USDT;
 
   if (
@@ -754,6 +870,7 @@ async function processAutoPayout(
     )}`,
     {
       method: "PATCH",
+
       body: JSON.stringify({
         status:
           "processing"
@@ -774,9 +891,11 @@ async function processAutoPayout(
       )}`,
       {
         method: "PATCH",
+
         body: JSON.stringify({
           status:
             "processing",
+
           tx_hash:
             tx.hash
         })
@@ -795,27 +914,30 @@ async function processAutoPayout(
       );
     }
 
-    const updated =
-      await supabaseRequest(
-        `/rest/v1/payouts?id=eq.${encodeURIComponent(
-          payoutId
-        )}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            status:
-              "paid",
-            tx_hash:
-              tx.hash,
-            processed_at:
-              new Date().toISOString()
-          })
-        }
-      );
+    await supabaseRequest(
+      `/rest/v1/payouts?id=eq.${encodeURIComponent(
+        payoutId
+      )}`,
+      {
+        method: "PATCH",
+
+        body: JSON.stringify({
+          status:
+            "paid",
+
+          tx_hash:
+            tx.hash,
+
+          processed_at:
+            new Date().toISOString()
+        })
+      }
+    );
 
     try {
       await bot.sendMessage(
         payout.chat_id,
+
         `✅ Withdrawal successful!
 
 🪙 Amount: ${payout.amount_nx} NX Coins
@@ -827,6 +949,7 @@ async function processAutoPayout(
     try {
       await bot.sendMessage(
         CONFIG.PAYMENT_CHANNEL,
+
         `💸 NX Coin Payment
 
 👤 User ID: ${payout.chat_id}
@@ -837,7 +960,7 @@ async function processAutoPayout(
       );
     } catch {}
 
-    return updated?.[0] || payout;
+    return payout;
 
   } catch (error) {
 
@@ -847,11 +970,15 @@ async function processAutoPayout(
       )}`,
       {
         method: "PATCH",
+
         body: JSON.stringify({
           status:
             "failed",
+
           error_message:
-            String(error.message)
+            String(
+              error.message
+            )
         })
       }
     );
@@ -861,7 +988,7 @@ async function processAutoPayout(
 }
 
 // =========================================================
-// HTTP HELPERS
+// HTTP JSON RESPONSE
 // =========================================================
 
 function sendJson(
@@ -874,10 +1001,13 @@ function sendJson(
     {
       "Content-Type":
         "application/json",
+
       "Access-Control-Allow-Origin":
         "*",
+
       "Access-Control-Allow-Headers":
         "Content-Type, X-Telegram-Init-Data",
+
       "Access-Control-Allow-Methods":
         "GET,POST,OPTIONS"
     }
@@ -887,6 +1017,10 @@ function sendJson(
     JSON.stringify(data)
   );
 }
+
+// =========================================================
+// READ REQUEST BODY
+// =========================================================
 
 function parseBody(req) {
   return new Promise(
@@ -934,11 +1068,19 @@ function parseBody(req) {
 // HTTP SERVER
 // =========================================================
 
+const PORT =
+  Number(
+    process.env.PORT
+  ) || 3000;
+
 const server =
   http.createServer(
     async (req, res) => {
-
       try {
+
+        // -------------------------------------------------
+        // CORS PREFLIGHT
+        // -------------------------------------------------
 
         if (
           req.method ===
@@ -951,12 +1093,13 @@ const server =
               ok: true
             }
           );
+
           return;
         }
 
-        // =================================================
+        // -------------------------------------------------
         // HEALTH
-        // =================================================
+        // -------------------------------------------------
 
         if (
           req.method === "GET" &&
@@ -967,18 +1110,21 @@ const server =
             200,
             {
               ok: true,
+
               app:
                 CONFIG.APP_NAME,
+
               status:
                 "online"
             }
           );
+
           return;
         }
 
-        // =================================================
+        // -------------------------------------------------
         // ROOT
-        // =================================================
+        // -------------------------------------------------
 
         if (
           req.method === "GET" &&
@@ -989,23 +1135,24 @@ const server =
             200,
             {
               ok: true,
+
               app:
                 CONFIG.APP_NAME
             }
           );
+
           return;
         }
 
-        // =================================================
+        // -------------------------------------------------
         // TELEGRAM WEBHOOK
-        // =================================================
+        // -------------------------------------------------
 
         if (
           req.method === "POST" &&
           req.url ===
             `/bot${BOT_TOKEN}`
         ) {
-
           const update =
             await parseBody(req);
 
@@ -1024,16 +1171,15 @@ const server =
           return;
         }
 
-        // =================================================
+        // -------------------------------------------------
         // VERIFY CHANNELS
-        // =================================================
+        // -------------------------------------------------
 
         if (
           req.method === "POST" &&
           req.url ===
             "/verify-channels"
         ) {
-
           const {
             telegramUser
           } =
@@ -1055,15 +1201,14 @@ const server =
           return;
         }
 
-        // =================================================
+        // -------------------------------------------------
         // SYNC
-        // =================================================
+        // -------------------------------------------------
 
         if (
           req.method === "POST" &&
           req.url === "/sync"
         ) {
-
           const {
             telegramUser
           } =
@@ -1092,9 +1237,11 @@ const server =
               user: {
                 id:
                   telegramUser.id,
+
                 username:
                   telegramUser.username ||
                   null,
+
                 firstName:
                   telegramUser.first_name ||
                   null
@@ -1138,10 +1285,13 @@ const server =
                   task => ({
                     id:
                       task.id,
+
                     title:
                       task.title,
+
                     reward:
                       task.reward,
+
                     url:
                       task.url
                   })
@@ -1152,18 +1302,24 @@ const server =
                   p => ({
                     id:
                       p.id,
+
                     amount:
                       Number(
                         p.amount_nx
                       ),
+
                     network:
                       p.network,
+
                     status:
                       p.status,
+
                     txHash:
                       p.tx_hash,
+
                     createdAt:
                       p.created_at,
+
                     processedAt:
                       p.processed_at
                   })
@@ -1174,15 +1330,14 @@ const server =
           return;
         }
 
-        // =================================================
-        // EARN
-        // =================================================
+        // -------------------------------------------------
+        // EARN TASK
+        // -------------------------------------------------
 
         if (
           req.method === "POST" &&
           req.url === "/earn"
         ) {
-
           const {
             telegramUser
           } =
@@ -1203,9 +1358,18 @@ const server =
               taskId
             )
           ) {
-            throw new Error(
-              "Invalid task ID"
+            sendJson(
+              res,
+              400,
+              {
+                ok: false,
+
+                error:
+                  "INVALID_TASK_ID"
+              }
             );
+
+            return;
           }
 
           const channelStatus =
@@ -1221,10 +1385,13 @@ const server =
               403,
               {
                 ok: false,
+
                 error:
                   "CHANNELS_NOT_VERIFIED",
+
                 mainChannel:
                   channelStatus.mainChannel,
+
                 paymentChannel:
                   channelStatus.paymentChannel
               }
@@ -1261,11 +1428,13 @@ const server =
             200,
             {
               ok: true,
+
               reward:
                 Number(
                   result.reward ||
                   CONFIG.TASK_REWARD
                 ),
+
               balance:
                 Number(
                   user.balance
@@ -1276,15 +1445,14 @@ const server =
           return;
         }
 
-        // =================================================
+        // -------------------------------------------------
         // CREATE PAYOUT
-        // =================================================
+        // -------------------------------------------------
 
         if (
           req.method === "POST" &&
           req.url === "/payout"
         ) {
-
           const {
             telegramUser
           } =
@@ -1316,6 +1484,7 @@ const server =
               400,
               {
                 ok: false,
+
                 error:
                   "INVALID_WALLET"
               }
@@ -1336,8 +1505,10 @@ const server =
               400,
               {
                 ok: false,
+
                 error:
                   "MINIMUM_WITHDRAWAL",
+
                 minimum:
                   CONFIG.MIN_WITHDRAWAL
               }
@@ -1351,14 +1522,17 @@ const server =
               `/rest/v1/rpc/create_manual_payout`,
               {
                 method: "POST",
+
                 body:
                   JSON.stringify({
                     p_chat_id:
                       Number(
                         telegramUser.id
                       ),
+
                     p_wallet:
                       wallet,
+
                     p_amount_nx:
                       amount
                   })
@@ -1384,8 +1558,8 @@ const server =
               await processAutoPayout(
                 result.payout_id
               );
-          } catch (error) {
 
+          } catch (error) {
             console.error(
               "Auto payout failed:",
               error.message
@@ -1409,41 +1583,50 @@ const server =
             {
               ok: true,
 
-              payout: payout
-                ? {
-                    id:
-                      payout.id,
-                    amount:
-                      Number(
-                        payout.amount_nx
-                      ),
-                    network:
-                      payout.network,
-                    status:
-                      payout.status,
-                    txHash:
-                      payout.tx_hash ||
-                      null
-                  }
-                : {
-                    id:
-                      result.payout_id,
-                    amount:
-                      amount,
-                    network:
-                      "BSC",
-                    status:
-                      "pending"
-                  }
+              payout:
+                payout
+                  ? {
+                      id:
+                        payout.id,
+
+                      amount:
+                        Number(
+                          payout.amount_nx
+                        ),
+
+                      network:
+                        payout.network,
+
+                      status:
+                        payout.status,
+
+                      txHash:
+                        payout.tx_hash ||
+                        null
+                    }
+
+                  : {
+                      id:
+                        result.payout_id,
+
+                      amount:
+                        amount,
+
+                      network:
+                        "BSC",
+
+                      status:
+                        "pending"
+                    }
             }
           );
 
           return;
         }
 
-        // =================================================
+        // -------------------------------------------------
         // PAYOUT HISTORY
-        // =================================================
+        // -------------------------------------------------
 
         if (
           req.method === "GET" &&
@@ -1451,7 +1634,6 @@ const server =
             "/payouts"
           )
         ) {
-
           const {
             telegramUser
           } =
@@ -1471,23 +1653,30 @@ const server =
             200,
             {
               ok: true,
+
               payouts:
                 payouts.map(
                   p => ({
                     id:
                       p.id,
+
                     amount:
                       Number(
                         p.amount_nx
                       ),
+
                     network:
                       p.network,
+
                     status:
                       p.status,
+
                     txHash:
                       p.tx_hash,
+
                     createdAt:
                       p.created_at,
+
                     processedAt:
                       p.processed_at
                   })
@@ -1498,16 +1687,15 @@ const server =
           return;
         }
 
-        // =================================================
+        // -------------------------------------------------
         // ADMIN PAYOUT
-        // =================================================
+        // -------------------------------------------------
 
         if (
           req.method === "POST" &&
           req.url ===
             "/admin/payout"
         ) {
-
           const body =
             await parseBody(req);
 
@@ -1521,6 +1709,7 @@ const server =
               401,
               {
                 ok: false,
+
                 error:
                   "UNAUTHORIZED"
               }
@@ -1539,9 +1728,18 @@ const server =
               payoutId
             )
           ) {
-            throw new Error(
-              "Invalid payout ID"
+            sendJson(
+              res,
+              400,
+              {
+                ok: false,
+
+                error:
+                  "INVALID_PAYOUT_ID"
+              }
             );
+
+            return;
           }
 
           const payout =
@@ -1554,6 +1752,7 @@ const server =
             200,
             {
               ok: true,
+
               payout
             }
           );
@@ -1561,18 +1760,22 @@ const server =
           return;
         }
 
+        // -------------------------------------------------
+        // NOT FOUND
+        // -------------------------------------------------
+
         sendJson(
           res,
           404,
           {
             ok: false,
+
             error:
               "NOT_FOUND"
           }
         );
 
       } catch (error) {
-
         console.error(
           "HTTP error:",
           error
@@ -1583,6 +1786,7 @@ const server =
           500,
           {
             ok: false,
+
             error:
               error.message ||
               "Internal server error"
@@ -1595,11 +1799,6 @@ const server =
 // =========================================================
 // START SERVER
 // =========================================================
-
-const PORT =
-  Number(
-    process.env.PORT
-  ) || 3000;
 
 server.listen(
   PORT,
@@ -1617,24 +1816,26 @@ server.listen(
       `Payment channel: ${CONFIG.PAYMENT_CHANNEL}`
     );
 
-    try {
+    // IMPORTANT:
+    // setMyName() intentionally removed.
+    // Bot name is already configured in Telegram.
 
-      await bot.setMyName(
-        CONFIG.APP_NAME
-      );
+    // Webhook is configured independently.
+    try {
+      const webhookUrl =
+        `${CONFIG.BACKEND_URL}/bot${BOT_TOKEN}`;
 
       await bot.setWebHook(
-        `${CONFIG.BACKEND_URL}/bot${BOT_TOKEN}`
+        webhookUrl
       );
 
       console.log(
-        "Telegram webhook configured."
+        "Telegram webhook configured successfully."
       );
 
     } catch (error) {
-
       console.error(
-        "Telegram setup error:",
+        "Webhook setup error:",
         error.message
       );
     }
