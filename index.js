@@ -9,7 +9,6 @@ const ethers = require("ethers");
 
 const CONFIG = {
   APP_NAME: "NX Coin",
-
   BOT_USERNAME: "NXCoinRobot",
 
   MAIN_CHANNEL: "@NXCoinOfficial",
@@ -24,16 +23,11 @@ const CONFIG = {
     "https://usdtbot-production-89e9.up.railway.app",
 
   STARTING_BALANCE: 500,
-
   TASK_REWARD: 50,
-
   REFERRAL_REWARD: 100,
-
   MIN_WITHDRAWAL: 500,
-
   TASK_COOLDOWN_HOURS: 24,
 
-  // INTERNAL ONLY
   NX_PER_USDT: 10000,
 
   TASKS: [
@@ -90,21 +84,14 @@ const CONFIG = {
 // ENVIRONMENT
 // =========================================================
 
-const BOT_TOKEN =
-  process.env.BOT_TOKEN;
-
-const SUPABASE_URL =
-  process.env.SUPABASE_URL;
-
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const ADMIN_SECRET =
-  process.env.ADMIN_SECRET;
-
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const PAYOUT_PRIVATE_KEY =
   process.env.PAYOUT_PRIVATE_KEY;
-
 const PAYOUT_WALLET =
   process.env.PAYOUT_WALLET;
 
@@ -121,15 +108,16 @@ if (!SUPABASE_URL) {
 }
 
 if (!SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("SUPABASE_SERVICE_ROLE_KEY missing");
+  throw new Error(
+    "SUPABASE_SERVICE_ROLE_KEY missing"
+  );
 }
 
 // =========================================================
 // TELEGRAM
 // =========================================================
 
-const bot =
-  new TelegramBot(BOT_TOKEN);
+const bot = new TelegramBot(BOT_TOKEN);
 
 // =========================================================
 // SUPABASE
@@ -155,14 +143,12 @@ async function supabaseRequest(path, options = {}) {
     }
   );
 
-  const text =
-    await response.text();
+  const text = await response.text();
 
   let data;
 
   try {
-    data =
-      text ? JSON.parse(text) : null;
+    data = text ? JSON.parse(text) : null;
   } catch {
     data = text;
   }
@@ -296,8 +282,7 @@ async function ensureUser(
   username = null,
   firstName = null
 ) {
-  let user =
-    await getUser(chatId);
+  let user = await getUser(chatId);
 
   if (!user) {
     await registerUser(
@@ -307,8 +292,7 @@ async function ensureUser(
       firstName
     );
 
-    user =
-      await getUser(chatId);
+    user = await getUser(chatId);
   } else {
     await updateUserProfile(
       chatId,
@@ -316,8 +300,7 @@ async function ensureUser(
       firstName
     );
 
-    user =
-      await getUser(chatId);
+    user = await getUser(chatId);
   }
 
   if (
@@ -329,8 +312,7 @@ async function ensureUser(
       chatId
     );
 
-    user =
-      await getUser(chatId);
+    user = await getUser(chatId);
   }
 
   return user;
@@ -349,8 +331,7 @@ function validateTelegramInitData(initData) {
     const params =
       new URLSearchParams(initData);
 
-    const hash =
-      params.get("hash");
+    const hash = params.get("hash");
 
     if (!hash) {
       return null;
@@ -505,7 +486,7 @@ async function isMemberOfChannel(
 }
 
 // =========================================================
-// OLD VERIFY CHANNELS
+// VERIFY CHANNELS
 // =========================================================
 
 async function verifyChannels(chatId) {
@@ -550,29 +531,24 @@ async function verifyChannels(chatId) {
 }
 
 // =========================================================
-// /START
+// START
 // =========================================================
 
 bot.onText(
   /\/start(?:\s+(.+))?/,
   async (msg, match) => {
     try {
-      const chatId =
-        msg.chat.id;
+      const chatId = msg.chat.id;
 
       const username =
-        msg.from?.username ||
-        null;
+        msg.from?.username || null;
 
       const firstName =
-        msg.from?.first_name ||
-        null;
+        msg.from?.first_name || null;
 
-      let referrerId =
-        null;
+      let referrerId = null;
 
-      const startParam =
-        match?.[1];
+      const startParam = match?.[1];
 
       if (
         startParam &&
@@ -582,8 +558,7 @@ bot.onText(
           startParam.slice(4);
 
         if (/^\d+$/.test(id)) {
-          referrerId =
-            Number(id);
+          referrerId = Number(id);
         }
       }
 
@@ -629,6 +604,35 @@ Complete tasks, invite friends and earn more NX Coins.`,
     }
   }
 );
+
+// =========================================================
+// SERVER-SIDE TASK STATUS
+// =========================================================
+
+async function getNxTaskStatus(chatId) {
+  try {
+    const result =
+      await supabaseRequest(
+        `/rest/v1/rpc/get_nx_task_status`,
+        {
+          method: "POST",
+
+          body: JSON.stringify({
+            p_chat_id: Number(chatId)
+          })
+        }
+      );
+
+    return result || {};
+  } catch (error) {
+    console.error(
+      "Task status error:",
+      error.message
+    );
+
+    return {};
+  }
+}
 
 // =========================================================
 // YOUTUBE TASK CLAIM
@@ -773,7 +777,7 @@ const ERC20_ABI = [
 ];
 
 // =========================================================
-// HTML ESCAPE FOR TELEGRAM
+// HTML ESCAPE
 // =========================================================
 
 function escapeTelegramHtml(value) {
@@ -959,10 +963,6 @@ async function processAutoPayout(
       }
     );
 
-    // =====================================================
-    // USER INFO FOR PAYMENT NOTIFICATION
-    // =====================================================
-
     const paidUser =
       await getUser(
         payout.chat_id
@@ -977,10 +977,6 @@ async function processAutoPayout(
       payout.wallet.length > 14
         ? `${payout.wallet.slice(0, 8)}...${payout.wallet.slice(-6)}`
         : payout.wallet;
-
-    // =====================================================
-    // USER PAYMENT MESSAGE
-    // =====================================================
 
     try {
       await bot.sendMessage(
@@ -1002,17 +998,6 @@ async function processAutoPayout(
         }
       );
     } catch {}
-
-    // =====================================================
-    // PROFESSIONAL PAYMENT CHANNEL MESSAGE
-    // =====================================================
-
-    /*
-      FULL TX HASH
-      + CLICKABLE BSCScan LINK
-      + USER ID
-      + USERNAME BELOW USER ID
-    */
 
     try {
       const bscScanUrl =
@@ -1065,7 +1050,6 @@ async function processAutoPayout(
     return payout;
 
   } catch (error) {
-
     await supabaseRequest(
       `/rest/v1/payouts?id=eq.${encodeURIComponent(
         payoutId
@@ -1179,7 +1163,6 @@ const server =
   http.createServer(
     async (req, res) => {
       try {
-
         if (
           req.method === "OPTIONS"
         ) {
@@ -1191,10 +1174,6 @@ const server =
 
           return;
         }
-
-        // -------------------------------------------------
-        // HEALTH
-        // -------------------------------------------------
 
         if (
           req.method === "GET" &&
@@ -1217,10 +1196,6 @@ const server =
           return;
         }
 
-        // -------------------------------------------------
-        // ROOT
-        // -------------------------------------------------
-
         if (
           req.method === "GET" &&
           req.url === "/"
@@ -1238,10 +1213,6 @@ const server =
 
           return;
         }
-
-        // -------------------------------------------------
-        // WEBHOOK
-        // -------------------------------------------------
 
         if (
           req.method === "POST" &&
@@ -1263,10 +1234,6 @@ const server =
 
           return;
         }
-
-        // -------------------------------------------------
-        // VERIFY CHANNELS
-        // -------------------------------------------------
 
         if (
           req.method === "POST" &&
@@ -1294,9 +1261,9 @@ const server =
           return;
         }
 
-        // -------------------------------------------------
-        // SYNC
-        // -------------------------------------------------
+        // =================================================
+        // SYNC WITH SERVER-SIDE TASK STATE
+        // =================================================
 
         if (
           req.method === "POST" &&
@@ -1313,6 +1280,52 @@ const server =
             await getUser(
               telegramUser.id
             );
+
+          const taskStatus =
+            await getNxTaskStatus(
+              telegramUser.id
+            );
+
+          const tasks =
+            CONFIG.TASKS.map(task => {
+              const status =
+                taskStatus[
+                  String(task.id)
+                ] || {
+                  claimed: false,
+                  nextClaimAt: null
+                };
+
+              return {
+                id:
+                  task.id,
+
+                type:
+                  task.type,
+
+                title:
+                  task.title,
+
+                reward:
+                  task.reward,
+
+                url:
+                  task.url,
+
+                channel:
+                  task.channel ||
+                  null,
+
+                claimed:
+                  Boolean(
+                    status.claimed
+                  ),
+
+                nextClaimAt:
+                  status.nextClaimAt ||
+                  null
+              };
+            });
 
           const payouts =
             await supabaseRequest(
@@ -1373,29 +1386,7 @@ const server =
               taskCooldownHours:
                 CONFIG.TASK_COOLDOWN_HOURS,
 
-              tasks:
-                CONFIG.TASKS.map(
-                  task => ({
-                    id:
-                      task.id,
-
-                    type:
-                      task.type,
-
-                    title:
-                      task.title,
-
-                    reward:
-                      task.reward,
-
-                    url:
-                      task.url,
-
-                    channel:
-                      task.channel ||
-                      null
-                  })
-                ),
+              tasks,
 
               payouts:
                 payouts.map(
@@ -1430,9 +1421,9 @@ const server =
           return;
         }
 
-        // -------------------------------------------------
+        // =================================================
         // EARN
-        // -------------------------------------------------
+        // =================================================
 
         if (
           req.method === "POST" &&
@@ -1515,6 +1506,19 @@ const server =
               telegramUser.id
             );
 
+          const taskStatus =
+            await getNxTaskStatus(
+              telegramUser.id
+            );
+
+          const currentTaskStatus =
+            taskStatus[
+              String(taskId)
+            ] || {
+              claimed: false,
+              nextClaimAt: null
+            };
+
           sendJson(
             res,
             200,
@@ -1533,8 +1537,13 @@ const server =
                   user.balance || 0
                 ),
 
+              claimed:
+                Boolean(
+                  currentTaskStatus.claimed
+                ),
+
               nextClaimAt:
-                result.next_claim_at ||
+                currentTaskStatus.nextClaimAt ||
                 null
             }
           );
@@ -1542,9 +1551,9 @@ const server =
           return;
         }
 
-        // -------------------------------------------------
+        // =================================================
         // PAYOUT
-        // -------------------------------------------------
+        // =================================================
 
         if (
           req.method === "POST" &&
@@ -1656,7 +1665,6 @@ const server =
                 result.payout_id
               );
           } catch (error) {
-
             console.error(
               "Auto payout failed:",
               error.message
@@ -1721,9 +1729,9 @@ const server =
           return;
         }
 
-        // -------------------------------------------------
+        // =================================================
         // PAYOUT HISTORY
-        // -------------------------------------------------
+        // =================================================
 
         if (
           req.method === "GET" &&
@@ -1784,9 +1792,9 @@ const server =
           return;
         }
 
-        // -------------------------------------------------
+        // =================================================
         // ADMIN PAYOUT
-        // -------------------------------------------------
+        // =================================================
 
         if (
           req.method === "POST" &&
@@ -1869,7 +1877,6 @@ const server =
         );
 
       } catch (error) {
-
         console.error(
           "HTTP error:",
           error
@@ -1897,7 +1904,6 @@ const server =
 server.listen(
   PORT,
   async () => {
-
     console.log(
       `${CONFIG.APP_NAME} backend running on port ${PORT}`
     );
@@ -1923,7 +1929,6 @@ server.listen(
       );
 
     } catch (error) {
-
       console.error(
         "Webhook setup error:",
         error.message
