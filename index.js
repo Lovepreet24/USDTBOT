@@ -36,10 +36,6 @@ const CONFIG = {
   // INTERNAL ONLY
   NX_PER_USDT: 10000,
 
-  // =======================================================
-  // ALL 5 TASKS
-  // =======================================================
-
   TASKS: [
     {
       id: 1,
@@ -48,7 +44,6 @@ const CONFIG = {
       reward: 50,
       url: "https://youtu.be/unTAEBvggus"
     },
-
     {
       id: 2,
       type: "youtube",
@@ -56,7 +51,6 @@ const CONFIG = {
       reward: 50,
       url: "https://youtu.be/Hja_iwEkfmI"
     },
-
     {
       id: 3,
       type: "youtube",
@@ -64,7 +58,6 @@ const CONFIG = {
       reward: 50,
       url: "https://youtu.be/I5mLBbsuAdA"
     },
-
     {
       id: 4,
       type: "telegram",
@@ -73,7 +66,6 @@ const CONFIG = {
       channel: "@NXCoinOfficial",
       url: "https://t.me/NXCoinOfficial"
     },
-
     {
       id: 5,
       type: "telegram",
@@ -95,7 +87,7 @@ const CONFIG = {
 };
 
 // =========================================================
-// ENVIRONMENT VARIABLES
+// ENVIRONMENT
 // =========================================================
 
 const BOT_TOKEN =
@@ -129,46 +121,39 @@ if (!SUPABASE_URL) {
 }
 
 if (!SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error(
-    "SUPABASE_SERVICE_ROLE_KEY missing"
-  );
+  throw new Error("SUPABASE_SERVICE_ROLE_KEY missing");
 }
 
 // =========================================================
-// TELEGRAM BOT
+// TELEGRAM
 // =========================================================
 
 const bot =
   new TelegramBot(BOT_TOKEN);
 
 // =========================================================
-// SUPABASE REQUEST
+// SUPABASE
 // =========================================================
 
-async function supabaseRequest(
-  path,
-  options = {}
-) {
-  const response =
-    await fetch(
-      `${SUPABASE_URL}${path}`,
-      {
-        ...options,
+async function supabaseRequest(path, options = {}) {
+  const response = await fetch(
+    `${SUPABASE_URL}${path}`,
+    {
+      ...options,
 
-        headers: {
-          apikey:
-            SUPABASE_SERVICE_ROLE_KEY,
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
 
-          Authorization:
-            `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        Authorization:
+          `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
 
-          "Content-Type":
-            "application/json",
+        "Content-Type":
+          "application/json",
 
-          ...(options.headers || {})
-        }
+        ...(options.headers || {})
       }
-    );
+    }
+  );
 
   const text =
     await response.text();
@@ -176,9 +161,8 @@ async function supabaseRequest(
   let data;
 
   try {
-    data = text
-      ? JSON.parse(text)
-      : null;
+    data =
+      text ? JSON.parse(text) : null;
   } catch {
     data = text;
   }
@@ -197,7 +181,7 @@ async function supabaseRequest(
 }
 
 // =========================================================
-// GET USER
+// USER
 // =========================================================
 
 async function getUser(chatId) {
@@ -210,10 +194,6 @@ async function getUser(chatId) {
 
   return data?.[0] || null;
 }
-
-// =========================================================
-// UPDATE USER PROFILE
-// =========================================================
 
 async function updateUserProfile(
   chatId,
@@ -228,11 +208,9 @@ async function updateUserProfile(
       method: "PATCH",
 
       body: JSON.stringify({
-        username:
-          username ?? null,
+        username: username ?? null,
 
-        first_name:
-          firstName ?? null,
+        first_name: firstName ?? null,
 
         updated_at:
           new Date().toISOString()
@@ -240,10 +218,6 @@ async function updateUserProfile(
     }
   );
 }
-
-// =========================================================
-// REGISTER USER
-// =========================================================
 
 async function registerUser(
   chatId,
@@ -257,36 +231,30 @@ async function registerUser(
       method: "POST",
 
       body: JSON.stringify({
-        p_chat_id:
-          Number(chatId),
+        p_chat_id: Number(chatId),
 
-        // Referral is processed separately.
-        // This prevents double rewards.
         p_referrer_id:
-          null,
+          referrerId
+            ? Number(referrerId)
+            : null,
 
-        p_username:
-          username,
+        p_username: username,
 
-        p_first_name:
-          firstName
+        p_first_name: firstName
       })
     }
   );
 }
 
 // =========================================================
-// PROCESS REFERRAL
+// REFERRAL
 // =========================================================
 
 async function processReferral(
   referrerId,
   referredId
 ) {
-  if (
-    !referrerId ||
-    !referredId
-  ) {
+  if (!referrerId) {
     return null;
   }
 
@@ -322,10 +290,6 @@ async function processReferral(
   }
 }
 
-// =========================================================
-// ENSURE USER
-// =========================================================
-
 async function ensureUser(
   chatId,
   referrerId = null,
@@ -356,12 +320,9 @@ async function ensureUser(
       await getUser(chatId);
   }
 
-  // Process referral independently.
-  // No channel verification required.
   if (
     referrerId &&
-    Number(referrerId) !==
-      Number(chatId)
+    Number(referrerId) !== Number(chatId)
   ) {
     await processReferral(
       referrerId,
@@ -376,24 +337,17 @@ async function ensureUser(
 }
 
 // =========================================================
-// TELEGRAM MINI APP INIT DATA VALIDATION
+// TELEGRAM INIT DATA
 // =========================================================
 
-function validateTelegramInitData(
-  initData
-) {
-  if (
-    !initData ||
-    !BOT_TOKEN
-  ) {
+function validateTelegramInitData(initData) {
+  if (!initData || !BOT_TOKEN) {
     return null;
   }
 
   try {
     const params =
-      new URLSearchParams(
-        initData
-      );
+      new URLSearchParams(initData);
 
     const hash =
       params.get("hash");
@@ -406,9 +360,8 @@ function validateTelegramInitData(
 
     const dataCheckString =
       [...params.entries()]
-        .sort(
-          ([a], [b]) =>
-            a.localeCompare(b)
+        .sort(([a], [b]) =>
+          a.localeCompare(b)
         )
         .map(
           ([key, value]) =>
@@ -431,9 +384,7 @@ function validateTelegramInitData(
           "sha256",
           secretKey
         )
-        .update(
-          dataCheckString
-        )
+        .update(dataCheckString)
         .digest("hex");
 
     if (
@@ -445,9 +396,7 @@ function validateTelegramInitData(
 
     if (
       !crypto.timingSafeEqual(
-        Buffer.from(
-          calculatedHash
-        ),
+        Buffer.from(calculatedHash),
         Buffer.from(hash)
       )
     ) {
@@ -461,10 +410,7 @@ function validateTelegramInitData(
       return null;
     }
 
-    return JSON.parse(
-      userJson
-    );
-
+    return JSON.parse(userJson);
   } catch (error) {
     console.error(
       "initData validation error:",
@@ -475,13 +421,7 @@ function validateTelegramInitData(
   }
 }
 
-// =========================================================
-// AUTHENTICATED MINI APP USER
-// =========================================================
-
-async function getAuthenticatedUser(
-  req
-) {
+async function getAuthenticatedUser(req) {
   const initData =
     req.headers[
       "x-telegram-init-data"
@@ -511,10 +451,8 @@ async function getAuthenticatedUser(
     await ensureUser(
       telegramUser.id,
       null,
-      telegramUser.username ||
-        null,
-      telegramUser.first_name ||
-        null
+      telegramUser.username || null,
+      telegramUser.first_name || null
     );
 
   return {
@@ -524,7 +462,7 @@ async function getAuthenticatedUser(
 }
 
 // =========================================================
-// CHECK CHANNEL MEMBERSHIP
+// CHANNEL MEMBERSHIP
 // =========================================================
 
 async function isMemberOfChannel(
@@ -543,25 +481,19 @@ async function isMemberOfChannel(
         "creator",
         "administrator",
         "member"
-      ].includes(
-        member.status
-      )
+      ].includes(member.status)
     ) {
       return true;
     }
 
-    // Telegram can return restricted
-    // members with is_member=true.
     if (
-      member.status ===
-        "restricted" &&
+      member.status === "restricted" &&
       member.is_member === true
     ) {
       return true;
     }
 
     return false;
-
   } catch (error) {
     console.error(
       `Channel check failed ${channel}:`,
@@ -573,13 +505,10 @@ async function isMemberOfChannel(
 }
 
 // =========================================================
-// VERIFY BOTH CHANNELS
-// LEGACY ENDPOINT
+// OLD VERIFY CHANNELS
 // =========================================================
 
-async function verifyChannels(
-  chatId
-) {
+async function verifyChannels(chatId) {
   const mainChannel =
     await isMemberOfChannel(
       chatId,
@@ -615,29 +544,13 @@ async function verifyChannels(
 
   return {
     verified,
-
     mainChannel,
-
     paymentChannel
   };
 }
 
 // =========================================================
-// VERIFY SPECIFIC TASK CHANNEL
-// =========================================================
-
-async function verifyTaskChannel(
-  chatId,
-  channel
-) {
-  return await isMemberOfChannel(
-    chatId,
-    channel
-  );
-}
-
-// =========================================================
-// /START COMMAND
+// /START
 // =========================================================
 
 bot.onText(
@@ -663,16 +576,12 @@ bot.onText(
 
       if (
         startParam &&
-        startParam.startsWith(
-          "ref_"
-        )
+        startParam.startsWith("ref_")
       ) {
         const id =
           startParam.slice(4);
 
-        if (
-          /^\d+$/.test(id)
-        ) {
+        if (/^\d+$/.test(id)) {
           referrerId =
             Number(id);
         }
@@ -685,22 +594,6 @@ bot.onText(
         firstName
       );
 
-      const keyboard = {
-        inline_keyboard: [
-          [
-            {
-              text:
-                "🚀 Open NX Coin",
-
-              web_app: {
-                url:
-                  CONFIG.WEB_APP_URL
-              }
-            }
-          ]
-        ]
-      };
-
       await bot.sendMessage(
         chatId,
 
@@ -711,11 +604,23 @@ bot.onText(
 Complete tasks, invite friends and earn more NX Coins.`,
 
         {
-          reply_markup:
-            keyboard
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text:
+                    "🚀 Open NX Coin",
+
+                  web_app: {
+                    url:
+                      CONFIG.WEB_APP_URL
+                  }
+                }
+              ]
+            ]
+          }
         }
       );
-
     } catch (error) {
       console.error(
         "/start error:",
@@ -726,13 +631,26 @@ Complete tasks, invite friends and earn more NX Coins.`,
 );
 
 // =========================================================
-// CLAIM YOUTUBE TASK
+// YOUTUBE TASK CLAIM
 // =========================================================
 
 async function claimYoutubeTask(
   chatId,
-  task
+  taskId
 ) {
+  const task =
+    CONFIG.TASKS.find(
+      x =>
+        x.id === taskId &&
+        x.type === "youtube"
+    );
+
+  if (!task) {
+    throw new Error(
+      "YouTube task not found"
+    );
+  }
+
   return await supabaseRequest(
     `/rest/v1/rpc/claim_youtube_task`,
     {
@@ -743,7 +661,7 @@ async function claimYoutubeTask(
           Number(chatId),
 
         p_task_id:
-          Number(task.id),
+          Number(taskId),
 
         p_reward:
           Number(task.reward)
@@ -753,29 +671,33 @@ async function claimYoutubeTask(
 }
 
 // =========================================================
-// CLAIM TELEGRAM TASK
+// TELEGRAM TASK CLAIM
 // =========================================================
 
 async function claimTelegramTask(
   chatId,
-  task
+  taskId
 ) {
-  if (
-    task.type !==
-    "telegram"
-  ) {
+  const task =
+    CONFIG.TASKS.find(
+      x =>
+        x.id === taskId &&
+        x.type === "telegram"
+    );
+
+  if (!task) {
     throw new Error(
-      "Invalid Telegram task"
+      "Telegram task not found"
     );
   }
 
-  const isMember =
-    await verifyTaskChannel(
+  const joined =
+    await isMemberOfChannel(
       chatId,
       task.channel
     );
 
-  if (!isMember) {
+  if (!joined) {
     return {
       success: false,
 
@@ -797,7 +719,7 @@ async function claimTelegramTask(
           Number(chatId),
 
         p_task_id:
-          Number(task.id),
+          Number(taskId),
 
         p_reward:
           Number(task.reward)
@@ -807,7 +729,7 @@ async function claimTelegramTask(
 }
 
 // =========================================================
-// CLAIM ANY TASK
+// GENERIC TASK CLAIM
 // =========================================================
 
 async function claimTask(
@@ -816,9 +738,7 @@ async function claimTask(
 ) {
   const task =
     CONFIG.TASKS.find(
-      x =>
-        x.id ===
-        taskId
+      x => x.id === taskId
     );
 
   if (!task) {
@@ -828,23 +748,22 @@ async function claimTask(
   }
 
   if (
-    task.type ===
-    "telegram"
+    task.type === "telegram"
   ) {
     return await claimTelegramTask(
       chatId,
-      task
+      taskId
     );
   }
 
   return await claimYoutubeTask(
     chatId,
-    task
+    taskId
   );
 }
 
 // =========================================================
-// ERC20 ABI
+// ERC20
 // =========================================================
 
 const ERC20_ABI = [
@@ -852,6 +771,17 @@ const ERC20_ABI = [
   "function balanceOf(address account) view returns (uint256)",
   "function decimals() view returns (uint8)"
 ];
+
+// =========================================================
+// HTML ESCAPE FOR TELEGRAM
+// =========================================================
+
+function escapeTelegramHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 // =========================================================
 // AUTO PAYOUT
@@ -914,15 +844,11 @@ async function processAutoPayout(
     );
 
   const amountUsdt =
-    Number(
-      payout.amount_nx
-    ) /
+    Number(payout.amount_nx) /
     CONFIG.NX_PER_USDT;
 
   if (
-    !Number.isFinite(
-      amountUsdt
-    ) ||
+    !Number.isFinite(amountUsdt) ||
     amountUsdt <= 0
   ) {
     throw new Error(
@@ -1033,32 +959,100 @@ async function processAutoPayout(
       }
     );
 
+    // =====================================================
+    // USER INFO FOR PAYMENT NOTIFICATION
+    // =====================================================
+
+    const paidUser =
+      await getUser(
+        payout.chat_id
+      );
+
+    const username =
+      paidUser?.username
+        ? `@${paidUser.username}`
+        : "No username";
+
+    const shortWallet =
+      payout.wallet.length > 14
+        ? `${payout.wallet.slice(0, 8)}...${payout.wallet.slice(-6)}`
+        : payout.wallet;
+
+    const shortTx =
+      tx.hash.length > 18
+        ? `${tx.hash.slice(0, 10)}...${tx.hash.slice(-8)}`
+        : tx.hash;
+
+    // =====================================================
+    // USER PAYMENT MESSAGE
+    // =====================================================
+
     try {
       await bot.sendMessage(
         payout.chat_id,
 
-        `✅ Withdrawal successful!
+        `✅ <b>Withdrawal Successful</b>
 
-🪙 Amount: ${payout.amount_nx} NX Coins
-🌐 Network: BSC
-🔗 TX: ${tx.hash}`
+🪙 <b>Amount:</b> ${escapeTelegramHtml(
+          payout.amount_nx
+        )} NX Coins
+🌐 <b>Network:</b> BSC
+🔗 <b>TX:</b>
+<code>${escapeTelegramHtml(
+          tx.hash
+        )}</code>`,
+
+        {
+          parse_mode: "HTML"
+        }
       );
     } catch {}
 
-    // ONLY FINAL PAYMENT MESSAGE
+    // =====================================================
+    // PROFESSIONAL PAYMENT CHANNEL MESSAGE
+    // =====================================================
+
     try {
       await bot.sendMessage(
         CONFIG.PAYMENT_CHANNEL,
 
-        `💸 NX Coin Payment
+        `💸 <b>NX COIN — PAYMENT SENT</b>
 
-👤 User ID: ${payout.chat_id}
-🪙 Amount: ${payout.amount_nx} NX Coins
-🌐 Network: BSC
-👛 Wallet: ${payout.wallet}
-🔗 TX: ${tx.hash}`
+👤 <b>User:</b> ${escapeTelegramHtml(
+          username
+        )}
+🆔 <b>ID:</b> <code>${escapeTelegramHtml(
+          payout.chat_id
+        )}</code>
+
+🪙 <b>Amount:</b> ${escapeTelegramHtml(
+          payout.amount_nx
+        )} NX Coins
+🌐 <b>Network:</b> <code>BSC</code>
+
+👛 <b>Wallet:</b>
+<code>${escapeTelegramHtml(
+          shortWallet
+        )}</code>
+
+🔗 <b>TX Hash:</b>
+<code>${escapeTelegramHtml(
+          shortTx
+        )}</code>
+
+✅ <b>Status:</b> PAID`,
+
+        {
+          parse_mode: "HTML",
+          disable_web_page_preview: true
+        }
       );
-    } catch {}
+    } catch (error) {
+      console.error(
+        "Payment channel message failed:",
+        error.message
+      );
+    }
 
     return payout;
 
@@ -1088,7 +1082,7 @@ async function processAutoPayout(
 }
 
 // =========================================================
-// HTTP JSON RESPONSE
+// JSON RESPONSE
 // =========================================================
 
 function sendJson(
@@ -1119,7 +1113,7 @@ function sendJson(
 }
 
 // =========================================================
-// READ REQUEST BODY
+// BODY
 // =========================================================
 
 function parseBody(req) {
@@ -1165,7 +1159,7 @@ function parseBody(req) {
 }
 
 // =========================================================
-// HTTP SERVER
+// SERVER
 // =========================================================
 
 const PORT =
@@ -1178,20 +1172,13 @@ const server =
     async (req, res) => {
       try {
 
-        // -------------------------------------------------
-        // CORS
-        // -------------------------------------------------
-
         if (
-          req.method ===
-          "OPTIONS"
+          req.method === "OPTIONS"
         ) {
           sendJson(
             res,
             200,
-            {
-              ok: true
-            }
+            { ok: true }
           );
 
           return;
@@ -1245,7 +1232,7 @@ const server =
         }
 
         // -------------------------------------------------
-        // TELEGRAM WEBHOOK
+        // WEBHOOK
         // -------------------------------------------------
 
         if (
@@ -1263,9 +1250,7 @@ const server =
           sendJson(
             res,
             200,
-            {
-              ok: true
-            }
+            { ok: true }
           );
 
           return;
@@ -1273,7 +1258,6 @@ const server =
 
         // -------------------------------------------------
         // VERIFY CHANNELS
-        // LEGACY ENDPOINT
         // -------------------------------------------------
 
         if (
@@ -1439,7 +1423,7 @@ const server =
         }
 
         // -------------------------------------------------
-        // EARN TASK
+        // EARN
         // -------------------------------------------------
 
         if (
@@ -1482,9 +1466,7 @@ const server =
 
           const task =
             CONFIG.TASKS.find(
-              x =>
-                x.id ===
-                taskId
+              x => x.id === taskId
             );
 
           if (!task) {
@@ -1501,46 +1483,6 @@ const server =
 
             return;
           }
-
-          // =================================================
-          // TELEGRAM TASK
-          // =================================================
-
-          if (
-            task.type ===
-            "telegram"
-          ) {
-            const isMember =
-              await verifyTaskChannel(
-                telegramUser.id,
-                task.channel
-              );
-
-            if (!isMember) {
-              sendJson(
-                res,
-                403,
-                {
-                  ok: false,
-
-                  error:
-                    "CHANNEL_NOT_JOINED",
-
-                  channel:
-                    task.channel,
-
-                  message:
-                    `Please join ${task.channel} first.`
-                }
-              );
-
-              return;
-            }
-          }
-
-          // =================================================
-          // CLAIM TASK
-          // =================================================
 
           const result =
             await claimTask(
@@ -1574,7 +1516,8 @@ const server =
               reward:
                 Number(
                   result.reward ||
-                  task.reward
+                  task.reward ||
+                  CONFIG.TASK_REWARD
                 ),
 
               balance:
@@ -1592,7 +1535,7 @@ const server =
         }
 
         // -------------------------------------------------
-        // CREATE PAYOUT
+        // PAYOUT
         // -------------------------------------------------
 
         if (
@@ -1704,8 +1647,8 @@ const server =
               await processAutoPayout(
                 result.payout_id
               );
-
           } catch (error) {
+
             console.error(
               "Auto payout failed:",
               error.message
@@ -1906,10 +1849,6 @@ const server =
           return;
         }
 
-        // -------------------------------------------------
-        // NOT FOUND
-        // -------------------------------------------------
-
         sendJson(
           res,
           404,
@@ -1922,6 +1861,7 @@ const server =
         );
 
       } catch (error) {
+
         console.error(
           "HTTP error:",
           error
@@ -1943,7 +1883,7 @@ const server =
   );
 
 // =========================================================
-// START SERVER
+// START
 // =========================================================
 
 server.listen(
@@ -1962,11 +1902,6 @@ server.listen(
       `Payment channel: ${CONFIG.PAYMENT_CHANNEL}`
     );
 
-    console.log(
-      "Total tasks:",
-      CONFIG.TASKS.length
-    );
-
     try {
       const webhookUrl =
         `${CONFIG.BACKEND_URL}/bot${BOT_TOKEN}`;
@@ -1980,6 +1915,7 @@ server.listen(
       );
 
     } catch (error) {
+
       console.error(
         "Webhook setup error:",
         error.message
