@@ -286,6 +286,29 @@ function validateTelegramInitData(initData) {
   }
 }
 
+// Reads the referral id from the mini app link
+// (https://t.me/NXCoinRobot/app?startapp=ref_123).
+// Only call this after validateTelegramInitData succeeded,
+// because the hash check also covers start_param.
+function getReferrerFromInitData(initData) {
+  try {
+    const params = new URLSearchParams(initData);
+    const startParam = params.get("start_param");
+
+    if (startParam && startParam.startsWith("ref_")) {
+      const id = startParam.slice(4);
+
+      if (/^\d+$/.test(id)) {
+        return Number(id);
+      }
+    }
+  } catch (error) {
+    console.error("start_param parse error:", error.message);
+  }
+
+  return null;
+}
+
 async function getAuthenticatedUser(req) {
   const initData = req.headers["x-telegram-init-data"];
 
@@ -299,9 +322,11 @@ async function getAuthenticatedUser(req) {
     throw new Error("Invalid Telegram authentication");
   }
 
+  const referrerId = getReferrerFromInitData(initData);
+
   const user = await ensureUser(
     telegramUser.id,
-    null,
+    referrerId,
     telegramUser.username || null,
     telegramUser.first_name || null
   );
@@ -445,6 +470,9 @@ async function getAdsgramTasks(chatId) {
 // =========================================================
 // /START
 // =========================================================
+// The bot no longer replies to /start.
+// The user is still registered and the referral is still processed
+// silently, so old ?start=ref_ID links keep working.
 
 bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   try {
@@ -468,25 +496,6 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
       referrerId,
       username,
       firstName
-    );
-
-    await bot.sendMessage(
-      chatId,
-      `🪙 Welcome to NX Coin!\n\n🎁 You received 500 NX Coins joining bonus.\n\nComplete tasks, invite friends and earn more NX Coins.`,
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "🚀 Open NX Coin",
-                web_app: {
-                  url: CONFIG.WEB_APP_URL
-                }
-              }
-            ]
-          ]
-        }
-      }
     );
   } catch (error) {
     console.error("/start error:", error);
