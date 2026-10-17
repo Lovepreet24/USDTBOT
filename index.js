@@ -543,7 +543,6 @@ async function failAndRefund(payoutId, message) {
 
 async function processAutoPayout(payoutId) {
   if (!PAYOUT_PRIVATE_KEY) throw new Error("PAYOUT_PRIVATE_KEY missing");
-  if (!PAYOUT_WALLET) throw new Error("PAYOUT_WALLET missing");
 
   // Atomic claim: sirf ek process is payout ko utha sakta hai
   const claimed = await supabaseRequest(
@@ -580,12 +579,17 @@ async function processAutoPayout(payoutId) {
 
     const tokenAmount = ethers.parseUnits(amountUsdt.toFixed(6), CONFIG.USDT_DECIMALS);
 
-    const usdtBalance = await usdt.balanceOf(PAYOUT_WALLET);
+    // Hamesha private key wale wallet ko check karo (PAYOUT_WALLET env ignore)
+    const usdtBalance = await usdt.balanceOf(wallet.address);
+    console.log(
+      `Payout wallet: ${wallet.address} | USDT: ${ethers.formatUnits(usdtBalance, CONFIG.USDT_DECIMALS)} | Need: ${ethers.formatUnits(tokenAmount, CONFIG.USDT_DECIMALS)}`
+    );
     if (usdtBalance < tokenAmount) {
       throw new Error("Insufficient payout wallet token balance");
     }
 
-    const nativeBalance = await provider.getBalance(PAYOUT_WALLET);
+    const nativeBalance = await provider.getBalance(wallet.address);
+    console.log(`BNB: ${ethers.formatEther(nativeBalance)}`);
     if (nativeBalance <= 0n) throw new Error("Insufficient BNB for gas");
 
     const tx = await usdt.transfer(payout.wallet, tokenAmount);
