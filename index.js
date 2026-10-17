@@ -409,30 +409,6 @@ async function getAdsgramTasks(chatId) {
 }
 
 // =========================================================
-// /START (silent)
-// =========================================================
-
-bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
-  try {
-    const chatId = msg.chat.id;
-    const username = msg.from?.username || null;
-    const firstName = msg.from?.first_name || null;
-
-    let referrerId = null;
-    const startParam = match?.[1];
-
-    if (startParam && startParam.startsWith("ref_")) {
-      const id = startParam.slice(4);
-      if (/^\d+$/.test(id)) referrerId = Number(id);
-    }
-
-    await ensureUser(chatId, referrerId, username, firstName);
-  } catch (error) {
-    console.error("/start error:", error);
-  }
-});
-
-// =========================================================
 // TASK CLAIMS
 // =========================================================
 
